@@ -65,7 +65,12 @@ class UserController
             Response::error('Não autorizado para gerenciar usuários.', 403);
         }
 
-        $this->service->delete($id);
-        Response::json(['message' => 'Usuário excluído com sucesso.']);
+        try {
+            $this->service->delete($id);
+            Response::json(['message' => 'Usuário excluído com sucesso.']);
+        } catch (\PDOException $e) {
+            error_log('User delete error: ' . $e->getMessage());
+            Response::error('Não é possível excluir este usuário no momento.', 400);
+        }
     }
 }

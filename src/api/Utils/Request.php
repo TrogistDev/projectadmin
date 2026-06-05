@@ -45,12 +45,14 @@ class Request
 
         foreach ($data as $key => $value) {
             if (is_string($value)) {
-                // 🟢 EXCEÇÃO DE SEGURANÇA: Campos confidenciais de credenciais brutas (senhas/tokens)
-                // NÃO passam por htmlspecialchars para evitar mutação de caracteres válidos.
+                $trimmed = trim($value);
+                if ($trimmed === '' || $trimmed === null) {
+                    continue;
+                }
                 if (in_array($key, ['contrasena', 'password', 'token', 'contrasena_verificar'], true)) {
-                    $clean[$key] = trim($value);
+                    $clean[$key] = $trimmed;
                 } else {
-                    $clean[$key] = trim(htmlspecialchars($value, ENT_QUOTES, 'UTF-8'));
+                    $clean[$key] = htmlspecialchars($trimmed, ENT_QUOTES, 'UTF-8');
                 }
             } elseif (is_array($value)) {
                 $clean[$key] = $this->sanitize($value);
@@ -69,12 +71,25 @@ class Request
 
     public function getQuery(): array
     {
-        return $this->query;
+        $query = $this->query;
+        
+        $map = [
+            'filter-start-date' => 'date_start',
+            'filter-end-date' => 'date_end',
+        ];
+        
+        foreach ($map as $old => $new) {
+            if (isset($query[$old]) && $query[$old] !== '') {
+                $query[$new] = $query[$old];
+            }
+        }
+        
+        return $query;
     }
 
     public function getMethod(): string
     {
-        return $this->server['REQUEST_METHOD'] ?? 'GET';
+        return strtoupper($this->server['REQUEST_METHOD'] ?? 'GET');
     }
 
     public function getPath(): string

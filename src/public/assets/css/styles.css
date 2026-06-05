@@ -1,24 +1,3 @@
-body {
-  background-color: #f8f9fa;
-}
-
-#app {
-  min-height: 100vh;
-}
-
-#dashboard-screen {
-  margin-top: 20px;
-}
-
-#project-detail {
-  margin-top: 24px;
-}
-
-.card .progress {
-  min-height: 12px;
-  height: 12px;
-}
-
 /* Progress bar customizada na tabela de projetos */
 .project-row-progress {
   height: 22px !important;
@@ -33,62 +12,12 @@ body {
   justify-content: center !important;
 }
 
-/* Timeline Styles */
-.timeline-container {
-  padding: 20px 0;
-}
-
-.timeline-container .progress {
-  height: 30px;
-  background-color: #e9ecef;
-}
-
-.timeline-container .progress-bar {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: bold;
-  color: white;
-  font-size: 12px;
-}
-
-/* View Tabs */
-.btn-group .btn-check:checked + .btn {
-  background-color: #0d6efd;
-  color: white;
-  border-color: #0d6efd;
-}
-
-/* Calendar Grid */
-#calendar-grid {
-  margin-top: 15px;
-}
-
-#calendar-grid > div {
-  padding: 10px;
-  border: 1px solid #dee2e6;
-  border-radius: 4px;
-  background-color: white;
-  min-height: 60px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-}
-
-#calendar-grid > div.other-month {
-  background-color: #f8f9fa;
-  color: #999;
-}
-
-/* ============================================
-   DESKTOP (>= 992px): tabela normal com tablehead visível
-   ============================================ */
+/* DESKTOP (>= 992px): tabela normal com tablehead visível */
 @media (min-width: 992px) {
   #projects-table td,
   #projects-table th {
     padding: 0.35rem 0.5rem;
   }
-
   #projects-table td[data-label="Descrição"],
   #projects-table td[data-label="Responsável"] {
     max-width: 180px;
@@ -96,29 +25,26 @@ body {
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-
   #projects-table .btn-sm {
     padding: 0.2rem 0.4rem;
     font-size: 0.75rem;
   }
-
   #projects-table .project-row-progress {
     height: 18px !important;
   }
-
   #projects-table .progress-bar {
     font-size: 0.7rem;
   }
 }
 
-/* ============================================
-   MOBILE: Tabela de projetos vira cards
-   ============================================ */
+/* MOBILE: Tabela de projetos vira cards */
 @media (max-width: 991px) {
   #projects-table thead {
     display: none;
   }
+}
 
+@media (max-width: 991px) {
   #projects-table,
   #projects-table tbody,
   #projects-table tr,
@@ -126,7 +52,6 @@ body {
     display: block;
     width: 100%;
   }
-
   #projects-table tr {
     margin-bottom: 0.6rem;
     border: 1px solid #dee2e6;
@@ -134,7 +59,6 @@ body {
     background: #fff;
     padding: 0;
   }
-
   #projects-table td {
     padding: 0.4rem 0.5rem;
     border: none;
@@ -148,7 +72,6 @@ body {
     white-space: normal;
     overflow: visible;
   }
-
   #projects-table td::before {
     content: attr(data-label);
     font-weight: 600;
@@ -160,12 +83,10 @@ body {
     padding-right: 0.5rem;
     white-space: nowrap;
   }
-
   #projects-table td[data-label="Ações"]::before,
   #projects-table td[data-label="Progresso"]::before {
     display: none;
   }
-
   #projects-table td[data-label="Progresso"],
   #projects-table td[data-label="Ações"],
   #projects-table td[data-label="Estado"] {
@@ -173,18 +94,15 @@ body {
     width: 100% !important;
     overflow: visible;
   }
-
   #projects-table td[data-label="Projeto"] {
     font-weight: 700;
     font-size: 1rem;
     padding-top: 0.5rem;
     padding-bottom: 0.35rem;
   }
-
   #projects-table td[data-label="Projeto"]::before {
     display: none;
   }
-
   #projects-table td[data-label="Descrição"] {
     grid-template-columns: 1fr !important;
     max-width: 100% !important;
@@ -193,16 +111,13 @@ body {
     overflow: hidden !important;
     text-overflow: ellipsis !important;
   }
-
   .project-row-progress {
     height: 22px !important;
     width: 100% !important;
   }
 }
 
-/* ============================================
-   Show More / Show Less para descrição
-   ============================================ */
+/* Show More / Show Less para descrição */
 .project-desc-text {
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -211,12 +126,10 @@ body {
   line-height: 1.45;
   max-height: 2.9em;
 }
-
 .project-desc-text.expanded {
   -webkit-line-clamp: unset;
   max-height: none;
 }
-
 .show-more-btn {
   background: none;
   border: none;
@@ -226,7 +139,6 @@ body {
   cursor: pointer;
   margin-top: 0.15rem;
 }
-
 .show-more-btn:hover {
   text-decoration: underline;
 }
@@ -236,28 +148,22 @@ body {
   margin: 1rem auto;
 }
 
-/* ============================================
-   Fases: checkbox tamanho fixo
-   ============================================ */
+/* Fases: checkbox tamanho fixo */
 .phase-item .form-check-input {
   width: 1.2rem !important;
   height: 1.2rem !important;
   flex-shrink: 0 !important;
 }
 
-/* ============================================
-   Inputs de fase (criação)
-   ============================================ */
+/* Inputs de fase (criação) */
 .dynamic-phase-input {
   display: block !important;
 }
-
 .dynamic-phase-input .phase-name-input {
   margin-bottom: 0.25rem;
   width: 100% !important;
   max-width: 100% !important;
 }
-
 .dynamic-phase-input .phase-desc-input {
   margin-bottom: 0.25rem;
   width: 100% !important;
@@ -265,7 +171,6 @@ body {
   resize: vertical;
   min-height: 3rem !important;
 }
-
 @media (min-width: 768px) {
   .dynamic-phase-input {
     display: flex !important;
@@ -273,14 +178,12 @@ body {
     gap: 0.5rem !important;
     align-items: center !important;
   }
-
   .dynamic-phase-input .phase-name-input {
     width: 220px !important;
     max-width: 220px !important;
     margin-bottom: 0;
     flex: 0 0 auto;
   }
-
   .dynamic-phase-input .phase-desc-input {
     width: 260px !important;
     max-width: 260px !important;
@@ -289,7 +192,7 @@ body {
   }
 }
 
-/* Botão Pausar: amarelo mais escuro no hover, sem background sólido */
+/* Botão Pausar */
 .pause-project-btn {
   border-color: #d9932e !important;
   color: #d9932e !important;
@@ -311,16 +214,11 @@ body {
   font-weight: 600 !important;
 }
 
-.list-group-item::before,
-.list-group-item::after {
-  content: none !important;
-}
-
 .badge {
   white-space: nowrap;
 }
 
-/* Members remove stray comma from list items */
+/* Members */
 #detail-body .list-group-item {
   word-break: break-word;
 }

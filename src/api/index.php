@@ -11,7 +11,8 @@ use Api\Utils\Response;
 Auth::start();
 
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
-$path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?? '/';
+    $method = strtoupper($method);
+    $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?? '/';
 
 $routes = [
     'GET|/api/login' => ['Api\Controllers\AuthController', 'loginForm'],

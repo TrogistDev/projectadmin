@@ -123,6 +123,7 @@ const App = {
   renderHeaderActions() {
     const role = App.user ? App.user.rol : "colaborador";
     const $buttonContainer = $("#create-project-button-container");
+    $buttonContainer.empty();
     if (role === "administrador" || role === "jefe_proyecto") {
       $buttonContainer.html('<button class="btn btn-primary" id="create-project-button">Novo projeto</button>');
     }

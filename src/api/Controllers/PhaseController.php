@@ -29,11 +29,10 @@ class PhaseController
         $role = $currentUser['rol'];
         $userId = (int)$currentUser['id'];
 
-        // Só bloqueia se o colaborador/jefe tentar listar um projeto no qual não está alocado
         $isMember = $this->projectService->isMember($projectId, $userId);
         $isResponsible = $this->projectService->isResponsible($projectId, $userId);
 
-        if ($role !== Permission::ADMIN && !$isMember && !$isResponsible) {
+        if (!Permission::canViewProject($role, $isMember)) {
             Response::error('Acceso denegado.', 403);
         }
 
@@ -42,32 +41,15 @@ class PhaseController
 
     public function create(int $projectId, Request $request): void
     {
-        Auth::requireLogin();
-        $currentUser = Auth::user();
-        $role = $currentUser['rol'];
-        $userId = (int)$currentUser['id'];
-
-        $isResponsible = $this->projectService->isResponsible($projectId, $userId);
-        $isMember = $this->projectService->isMember($projectId, $userId);
-
-        // Utiliza a validação centralizada
-        if (!Permission::canEditPhase($role, $isResponsible, $isMember)) {
-            Response::error('No autorizado para crear fases en este proyecto.', 403);
-        }
-
+        $this->authorizePhaseModification($projectId);
         $phaseId = $this->service->create($projectId, $request->getBody());
-        
         $this->projectService->recalculateStatus($projectId);
-        
         Response::json(['id' => $phaseId], 201);
     }
 
     public function update(int $id, Request $request): void
     {
         Auth::requireLogin();
-        $currentUser = Auth::user();
-        $role = $currentUser['rol'];
-        $userId = (int)$currentUser['id'];
 
         $phase = $this->service->find($id);
         if (!$phase) {
@@ -75,26 +57,22 @@ class PhaseController
         }
 
         $projectId = (int)$phase['proyecto_id'];
-
-        $isResponsible = $this->projectService->isResponsible($projectId, $userId);
-        $isMember = $this->projectService->isMember($projectId, $userId);
-
         $data = $request->getBody();
 
-        $isOnlyTogglingCompletion = isset($data['completada']) && !isset($data['nombre']) && !isset($data['descripcion']) && !isset($data['orden']);
+        $isOnlyToggling = isset($data['completada']) && 
+                         !isset($data['nombre']) && 
+                         !isset($data['descripcion']) && 
+                         !isset($data['orden']);
 
-        if ($isOnlyTogglingCompletion) {
-            $hasAccessToProject = ($role === Permission::ADMIN) || ($role === Permission::JEFE) || $isMember;
-            
-            if (!$hasAccessToProject) {
-                Response::error('No tempe permisos para interagir com este proyecto.', 403);
+        if ($isOnlyToggling) {
+            $currentUser = Auth::user();
+            if (!Permission::canTogglePhase($currentUser['rol'])) {
+                Response::error('No tempe permisos para interagir com este projeto.', 403);
             }
         } else {
-            if (!Permission::canEditPhase($role, $isResponsible, $isMember)) {
-                Response::error('Acceso denegado. No tempe permisos para gerenciar la estructura de la fase.', 403);
-            }
-            
-            if ($role === Permission::COLABORADOR) {
+            $this->authorizePhaseModification($projectId);
+            $currentUser = Auth::user();
+            if ($currentUser['rol'] === Permission::COLABORADOR) {
                 Response::error('No autorizado para modificar la estructura de la fase.', 403);
             }
         }
@@ -107,9 +85,6 @@ class PhaseController
     public function delete(int $id): void
     {
         Auth::requireLogin();
-        $currentUser = Auth::user();
-        $role = $currentUser['rol'];
-        $userId = (int)$currentUser['id'];
 
         $projectId = $this->service->getProjectId($id);
         if ($projectId === null) {
@@ -120,15 +95,24 @@ class PhaseController
             Response::error('No se puede eliminar fases de un proyecto finalizado.', 400);
         }
 
+        $this->authorizePhaseModification((int)$projectId);
+        $this->service->delete($id);
+        $this->projectService->recalculateStatus((int)$projectId);
+        Response::json(['message' => 'Fase eliminada.']);
+    }
+
+    private function authorizePhaseModification(int $projectId): void
+    {
+        Auth::requireLogin();
+        $currentUser = Auth::user();
+        $role = $currentUser['rol'];
+        $userId = (int)$currentUser['id'];
+
         $isResponsible = $this->projectService->isResponsible($projectId, $userId);
         $isMember = $this->projectService->isMember($projectId, $userId);
 
         if (!Permission::canEditPhase($role, $isResponsible, $isMember)) {
-            Response::error('No autorizado para eliminar fases en este proyecto.', 403);
+            Response::error('No autorizado para editar fases en este proyecto.', 403);
         }
-
-        $this->service->delete($id);
-        $this->projectService->recalculateStatus($projectId);
-        Response::json(['message' => 'Fase eliminada.']);
     }
 }

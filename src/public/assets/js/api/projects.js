@@ -351,11 +351,12 @@ const Projects = {
     ApiClient.updateProject(id, { estado: isCurrentlyPaused ? "en_curso" : "pausado" })
       .done(() => {
         App.showFeedback("Estado do projeto atualizado com sucesso.", "success", "#dashboard-feedback");
-        this.loadProjects();
+        this.loadProjects(true);
         if (App.currentProjectId == id) this.openProject(id);
       })
       .fail((xhr) => {
-        const msg = xhr.responseJSON?.error || "Erro ao alterar estado do projeto.";
+        const msg = xhr.responseJSON?.error || xhr.responseText || "Erro ao alterar estado do projeto.";
+        console.error("Pause toggle error:", msg);
         App.showFeedback(msg, "danger", "#dashboard-feedback");
       });
   },

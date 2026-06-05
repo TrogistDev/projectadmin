@@ -14,8 +14,8 @@ class UserService
     {
         $pdo = Database::getConnection();
 
-        $limit = isset($filter['limit']) && is_numeric($filter['limit']) ? (int)$filter['limit'] : 50;
-        $page = isset($filter['page']) && is_numeric($filter['page']) && (int)$filter['page'] > 0 ? (int)$filter['page'] : 1;
+        $limit = (int)($filter['limit'] ?? 50);
+        $page = max(1, (int)($filter['page'] ?? 1));
         $offset = ($page - 1) * $limit;
 
         $where = [];
@@ -45,6 +45,77 @@ class UserService
 
     public function create(array $data): array
     {
+        $this->validateUserData($data);
+
+        $db = Database::getConnection();
+
+        if ($this->emailExists($db, $data['correo'])) {
+            throw new InvalidArgumentException('Este e-mail já está cadastrado no sistema.');
+        }
+
+        $passwordHash = password_hash($data['contrasena'], PASSWORD_BCRYPT);
+
+        $stmt = $db->prepare(
+            'INSERT INTO usuarios (nombre, apellidos, correo, contrasena, rol, departamento) 
+             VALUES (:nombre, :apellidos, :correo, :contrasena, :rol, :departamento)'
+        );
+        $stmt->execute([
+            ':nombre'     => $data['nombre'],
+            ':apellidos'  => $data['apellidos'] ?? '',
+            ':correo'     => $data['correo'],
+            ':contrasena' => $passwordHash,
+            ':rol'        => $data['rol'],
+            ':departamento' => $data['departamento'] ?? null,
+        ]);
+
+        return [
+            'id'        => (int)$db->lastInsertId(),
+            'nombre'    => $data['nombre'],
+            'apellidos' => $data['apellidos'] ?? '',
+            'correo'    => $data['correo'],
+            'rol'       => $data['rol'],
+            'departamento' => $data['departamento'] ?? null
+        ];
+    }
+
+    public function update(int $id, array $data): void
+    {
+        $this->validateUpdateData($data);
+
+        $db = Database::getConnection();
+        $updates = $this->buildUpdateFields($data);
+
+        if (empty($updates['fields'])) {
+            return;
+        }
+
+        $sql = 'UPDATE usuarios SET ' . implode(', ', $updates['fields']) . ' WHERE id = :id';
+        $stmt = $db->prepare($sql);
+        $stmt->execute(array_merge($updates['params'], ['id' => $id]));
+    }
+
+    public function delete(int $id): void
+    {
+        $pdo = Database::getConnection();
+
+        $stmt = $pdo->prepare('SELECT COUNT(*) FROM proyectos WHERE responsable_id = :id');
+        $stmt->execute(['id' => $id]);
+        if ((int)$stmt->fetchColumn() > 0) {
+            throw new InvalidArgumentException('Não é possível excluir: usuário é responsável por projetos.');
+        }
+
+        $stmt = $pdo->prepare('SELECT COUNT(*) FROM proyecto_miembro WHERE usuario_id = :id');
+        $stmt->execute(['id' => $id]);
+        if ((int)$stmt->fetchColumn() > 0) {
+            throw new InvalidArgumentException('Não é possível excluir: usuário está em projetos.');
+        }
+
+        $stmt = $pdo->prepare('DELETE FROM usuarios WHERE id = :id');
+        $stmt->execute(['id' => $id]);
+    }
+
+    private function validateUserData(array $data): void
+    {
         if (empty($data['nombre']) || empty($data['correo']) || empty($data['rol']) || empty($data['contrasena'])) {
             throw new InvalidArgumentException('Todos os campos obrigatórios devem ser preenchidos.');
         }
@@ -56,90 +127,51 @@ class UserService
         if (strlen($data['contrasena']) < 8) {
             throw new InvalidArgumentException('A senha deve ter no mínimo 8 caracteres.');
         }
-
-        $db = Database::getConnection();
-
-        $stmtCheck = $db->prepare("SELECT id FROM usuarios WHERE correo = :correo LIMIT 1");
-        $stmtCheck->execute([':correo' => $data['correo']]);
-        if ($stmtCheck->fetch()) {
-            throw new InvalidArgumentException('Este e-mail já está cadastrado no sistema.');
-        }
-
-        $passwordHash = password_hash($data['contrasena'], PASSWORD_BCRYPT);
-
-        $sql = "INSERT INTO usuarios (nombre, apellidos, correo, contrasena, rol, departamento) 
-                VALUES (:nombre, :apellidos, :correo, :contrasena, :rol, :departamento)";
-
-        $stmt = $db->prepare($sql);
-        $stmt->execute([
-            ':nombre'     => $data['nombre'],
-            ':apellidos'  => $data['apellidos'] ?? '',
-            ':correo'     => $data['correo'],
-            ':contrasena' => $passwordHash,
-            ':rol'        => $data['rol'],
-            ':departamento' => $data['departamento'] ?? null,
-        ]);
-
-        $newId = (int)$db->lastInsertId();
-        
-        return [
-            'id'        => $newId,
-            'nombre'    => $data['nombre'],
-            'apellidos' => $data['apellidos'] ?? '',
-            'correo'    => $data['correo'],
-            'rol'       => $data['rol'],
-            'departamento' => $data['departamento'] ?? null
-        ];
     }
 
-    public function update(int $id, array $data): void
+    private function validateUpdateData(array $data): void
     {
-        $db = Database::getConnection();
-        
+        if (isset($data['contrasena']) && strlen($data['contrasena']) < 8) {
+            throw new InvalidArgumentException('A senha deve ter no mínimo 8 caracteres.');
+        }
+    }
+
+    private function emailExists(PDO $db, string $email): bool
+    {
+        $stmt = $db->prepare("SELECT id FROM usuarios WHERE correo = :correo LIMIT 1");
+        $stmt->execute([':correo' => $email]);
+        return (bool)$stmt->fetch();
+    }
+
+    private function buildUpdateFields(array $data): array
+    {
         $fields = [];
-        $params = ['id' => $id];
+        $params = ['id' => null];
 
-        if (isset($data['nombre'])) {
-            $fields[] = 'nombre = :nombre';
-            $params['nombre'] = $data['nombre'];
-        }
-
-        if (isset($data['apellidos'])) {
-            $fields[] = 'apellidos = :apellidos';
-            $params['apellidos'] = $data['apellidos'];
-        }
-
-        if (isset($data['rol'])) {
-            $fields[] = 'rol = :rol';
-            $params['rol'] = $data['rol'];
-        }
-
-        if (isset($data['departamento'])) {
-            $fields[] = 'departamento = :departamento';
-            $params['departamento'] = $data['departamento'];
-        }
-
-        if (isset($data['contrasena'])) {
-            if (strlen($data['contrasena']) < 8) {
-                throw new InvalidArgumentException('A senha deve ter no mínimo 8 caracteres.');
+        $mapping = [
+            'nombre' => 'nombre',
+            'apellidos' => 'apellidos',
+            'rol' => 'rol',
+            'departamento' => 'departamento',
+            'contrasena' => function($v) {
+                return password_hash($v, PASSWORD_BCRYPT);
             }
-            $fields[] = 'contrasena = :contrasena';
-            $params['contrasena'] = password_hash($data['contrasena'], PASSWORD_BCRYPT);
+        ];
+
+        foreach ($mapping as $field => $handler) {
+            if (isset($data[$field])) {
+                $value = is_callable($handler) ? $handler($data[$field]) : $data[$field];
+                $fields[] = "$field = :$field";
+                $params[$field] = $value;
+            }
         }
 
         if (empty($fields)) {
-            return;
+            return ['fields' => [], 'params' => []];
         }
 
-        $sql = 'UPDATE usuarios SET ' . implode(', ', $fields) . ' WHERE id = :id';
-        $stmt = $db->prepare($sql);
-        $stmt->execute($params);
-    }
+        $params['id'] = null;
 
-    public function delete(int $id): void
-    {
-        $db = Database::getConnection();
-        $stmt = $db->prepare('DELETE FROM usuarios WHERE id = :id');
-        $stmt->execute(['id' => $id]);
+        return ['fields' => $fields, 'params' => array_filter($params, fn($k) => $k !== 'id')];
     }
 }

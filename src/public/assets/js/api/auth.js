@@ -21,6 +21,7 @@ const Auth = {
         sessionStorage.setItem("user", JSON.stringify(App.user));
 
         Auth.showDashboard();
+        $("#login-feedback").empty();
         Projects.loadProjects();
         Users.loadUsers();
       })
@@ -65,6 +66,15 @@ const Auth = {
       $("#edit-project-form")[0].reset();
       $("#create-user-form")[0].reset();
       $("#login-form")[0].reset();
+
+      $("#filter-search").val("");
+      $("#filter-state").val("");
+      $("#filter-responsible").val("");
+      $("#filter-date-order").val("");
+      $("#filter-deadline-order").val("");
+      $("#filter-start-date").val("");
+      $("#filter-end-date").val("");
+      $("#filter-badge").addClass("d-none");
 
       App.closeDetail();
       Auth.showLogin();

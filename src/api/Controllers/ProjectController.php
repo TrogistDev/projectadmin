@@ -23,7 +23,16 @@ class ProjectController
     {
         Auth::requireLogin();
         $filter = $request->getQuery();
-        Response::json($this->service->list($filter, Auth::user()));
+        try {
+            $result = $this->service->list($filter, Auth::user());
+            Response::json($result);
+        } catch (\PDOException $e) {
+            error_log('SQL Error: ' . $e->getMessage());
+            Response::error('Erro ao listar projetos.', 500);
+        } catch (\Throwable $e) {
+            error_log('List error: ' . $e->getMessage());
+            Response::error('Erro interno.', 500);
+        }
     }
 
     public function show(int $id): void
@@ -66,8 +75,15 @@ class ProjectController
             Response::error('No autorizado para editar este proyecto.', 403);
         }
 
-        $this->service->update($id, $request->getBody());
-        Response::json(['message' => 'Proyecto actualizado.']);
+        try {
+            $this->service->update($id, $request->getBody());
+            Response::json(['message' => 'Proyecto actualizado.']);
+        } catch (\PDOException $e) {
+            error_log('Update error: ' . $e->getMessage());
+            Response::error('Erro ao atualizar projeto.', 500);
+        } catch (\InvalidArgumentException $e) {
+            Response::error($e->getMessage(), 422);
+        }
     }
 
     public function delete(int $id): void

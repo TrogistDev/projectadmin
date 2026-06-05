@@ -16,8 +16,6 @@ const ApiClient = {
       contentType: "application/json",
       dataType: "json",
       xhrFields: { withCredentials: true },
-    }).fail((xhr) => {
-      console.error(`API Error [${method} ${url}]`);
     });
   },
 

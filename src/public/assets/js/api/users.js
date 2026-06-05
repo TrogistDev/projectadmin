@@ -146,7 +146,7 @@ const Users = {
     });
 
     $("#users-list-container").off("click", ".delete-user-btn").on("click", ".delete-user-btn", (e) => {
-      const userId = $(e.target).data("user-id");
+      const userId = $(e.currentTarget).data("user-id");
       if (!confirm("¿Está seguro de eliminar este usuario?")) return;
 
       ApiClient.deleteUser(userId)
@@ -154,7 +154,7 @@ const Users = {
           this.loadUsers();
         })
         .fail((xhr) => {
-          alert(xhr.responseJSON?.error || "Error al eliminar usuario.");
+          alert(xhr.responseJSON?.error || xhr.responseText || "Error al eliminar usuario.");
         });
     });
   }

@@ -9,9 +9,8 @@ const ProjectDetail = {
 
     const canManageTeam = currentUser.rol === 'administrador' || currentUser.rol === 'jefe_proyecto';
 
-    const canReorderPhases = (currentUser.rol === 'administrador') || 
-                             (currentUser.rol === 'jefe_proyecto' && project.responsable_id == currentUser.id) || 
-                             (currentUser.rol === 'colaborador' && (project.members || project.miembros || []).some(m => m.usuario_id == currentUser.id));
+const canReorderPhases = (currentUser.rol === 'administrador') || 
+                              (currentUser.rol === 'jefe_proyecto' && project.responsable_id == currentUser.id);
 
     const projectPhases = project.phases || project.fases || [];
     const projectMembers = project.members || project.miembros || project.equipo || [];
