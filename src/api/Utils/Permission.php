@@ -6,7 +6,8 @@ namespace Api\Utils;
 
 class Permission
 {
-    public const ADMIN = 'administrador';
+    // Deve ser idêntico ao valor do ENUM mapeado na tabela do banco
+    public const ADMIN = 'administrador'; 
     public const JEFE = 'jefe_proyecto';
     public const COLABORADOR = 'colaborador';
 
@@ -35,8 +36,23 @@ class Permission
         return in_array($role, [self::ADMIN, self::JEFE], true);
     }
 
-    public static function canEditPhase(string $role, bool $isProjectMember): bool
+    /**
+     * Validação centralizada para manipulação de fases
+     */
+    public static function canEditPhase(string $role, bool $isResponsible, bool $isMember): bool
     {
-        return in_array($role, [self::ADMIN, self::JEFE, self::COLABORADOR], true) && $isProjectMember;
+        if ($role === self::ADMIN) {
+            return true;
+        }
+
+        if ($role === self::JEFE) {
+            return $isResponsible;
+        }
+
+        if ($role === self::COLABORADOR) {
+            return $isMember;
+        }
+
+        return false;
     }
 }

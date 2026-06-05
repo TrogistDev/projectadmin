@@ -22,13 +22,27 @@ class UserController
     public function index(Request $request): void
     {
         Auth::requireLogin();
-        $currentUser = Auth::user();
+        try {
+            $users = $this->service->list($request->getQuery());
+            Response::json($users);
+        } catch (\Throwable $e) {
+            error_log('User list error: ' . $e->getMessage());
+            Response::json([]);
+        }
+    }
 
-        if (!Permission::canManageUsers($currentUser['rol'])) {
-            Response::error('No autorizado para ver usuarios.', 403);
+    public function create(Request $request): void
+    {
+        Auth::requireLogin();
+        $currentUser = Auth::user();
+        $userRole = $currentUser['rol'] ?? $currentUser['role'] ?? '';
+
+        if (!Permission::canManageUsers($userRole)) {
+            Response::error('Não autorizado para gerenciar usuários.', 403);
         }
 
-        $users = $this->service->list($request->getQuery());
-        Response::json($users);
+        $data = $request->getBody();
+        $newUser = $this->service->create($data);
+        Response::json($newUser, 201);
     }
 }

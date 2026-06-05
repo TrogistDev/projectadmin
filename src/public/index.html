@@ -1,108 +1,191 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Project Admin</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="assets/css/styles.css">
-</head>
-<body>
-<div class="container py-5" id="app">
-    <div id="login-screen" class="card mx-auto shadow-sm" style="max-width: 420px;">
-        <div class="card-body">
-            <h4 class="card-title mb-4">Entrar no Project Admin</h4>
-            <div id="login-feedback"></div>
-            <form id="login-form">
-                <div class="mb-3">
-                    <label for="login-email" class="form-label">Email</label>
-                    <input type="email" class="form-control" id="login-email" required>
-                </div>
-                <div class="mb-3">
-                    <label for="login-password" class="form-label">Senha</label>
-                    <input type="password" class="form-control" id="login-password" required minlength="8">
-                </div>
-                <button type="submit" class="btn btn-primary w-100">Entrar</button>
-            </form>
-        </div>
-    </div>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+    <link rel="stylesheet" href="assets/css/styles.css" />
+  </head>
+  <body>
+    <div class="container py-5" id="app">
 
-    <div id="dashboard-screen" class="d-none">
-        <nav class="navbar navbar-expand-lg navbar-light bg-light rounded mb-4">
-            <div class="container-fluid">
-                <span class="navbar-brand">Project Admin</span>
-                <button class="btn btn-outline-secondary" id="logout-button">Sair</button>
+      <!-- TELA DE LOGIN -->
+      <div id="login-screen" class="card mx-auto shadow-sm" style="max-width: 420px">
+        <div class="card-body">
+          <h4 class="card-title mb-4">Entrar no Project Admin</h4>
+          <div id="login-feedback"></div>
+          <form id="login-form">
+            <div class="mb-3">
+              <label for="login-email" class="form-label">Email</label>
+              <input type="email" class="form-control" id="login-email" required />
             </div>
+            <div class="mb-3">
+              <label for="login-password" class="form-label">Senha</label>
+              <input type="password" class="form-control" id="login-password" required minlength="8" />
+            </div>
+            <button type="submit" class="btn btn-primary w-100">Entrar</button>
+          </form>
+        </div>
+      </div>
+
+      <!-- TELA DO DASHBOARD -->
+      <div id="dashboard-screen" class="d-none">
+
+        <!-- NAVBAR -->
+        <nav class="navbar navbar-expand-lg navbar-light bg-light rounded mb-4">
+          <div class="container-fluid">
+            <span class="navbar-brand">Project Admin</span>
+            <button class="btn btn-outline-secondary" id="logout-button">Sair</button>
+            <button class="btn btn-outline-primary me-2 d-none" id="admin-users-button">Gerenciar Usuários</button>
+          </div>
         </nav>
 
         <div id="dashboard-feedback"></div>
 
+        <!-- FILTROS E RESUMO -->
         <div class="row mb-3">
-            <div class="col-md-4">
-                <div class="card card-body mb-3">
-                    <h5 class="card-title">Filtrar projetos</h5>
-                    <div class="mb-3">
-                        <label for="project-search" class="form-label">Buscar nome</label>
-                        <input type="text" id="project-search" class="form-control" placeholder="Nome do projeto">
-                    </div>
-                    <div class="mb-3">
-                        <label for="project-state" class="form-label">Estado</label>
-                        <select id="project-state" class="form-select">
-                            <option value="">Todos</option>
-                            <option value="planificacion">Planejamento</option>
-                            <option value="en_curso">Em curso</option>
-                            <option value="pausado">Pausado</option>
-                            <option value="finalizado">Finalizado</option>
-                        </select>
-                    </div>
-                    <button class="btn btn-secondary w-100" id="refresh-projects">Atualizar</button>
-                </div>
+          <div class="col-md-12">
+            <div class="card card-body mb-3">
+              <h5 class="card-title">Resumo</h5>
+              <div class="row" id="summary-cards"></div>
             </div>
-
-            <div class="col-md-8">
-                <div class="card card-body mb-3">
-                    <h5 class="card-title">Resumo</h5>
-                    <div class="row" id="summary-cards"></div>
-                </div>
-            </div>
+          </div>
         </div>
 
+        <!-- TABELA DE PROJETOS -->
         <div class="card mb-4">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h5 class="mb-0">Projetos</h5>
-                <button class="btn btn-primary" id="create-project-button">Novo projeto</button>
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <div>
+              <h5 class="mb-0 d-inline-block">Projetos</h5>
+              <div class="btn-group ms-3" role="group">
+                <input type="radio" class="btn-check" name="view-type" id="view-list" value="list" checked />
+                <label class="btn btn-outline-secondary btn-sm" for="view-list">Lista</label>
+                <input type="radio" class="btn-check" name="view-type" id="view-calendar" value="calendar" />
+                <label class="btn btn-outline-secondary btn-sm" for="view-calendar">Calendário</label>
+                <input type="radio" class="btn-check" name="view-type" id="view-timeline" value="timeline" />
+                <label class="btn btn-outline-secondary btn-sm" for="view-timeline">Timeline</label>
+              </div>
             </div>
-            <div class="card-body">
-                <div class="table-responsive">
-                    <table class="table table-hover" id="projects-table">
-                        <thead>
-                        <tr>
-                            <th>Nome</th>
-                            <th>Responsável</th>
-                            <th>Estado</th>
-                            <th>Progresso</th>
-                            <th>Ações</th>
-                        </tr>
-                        </thead>
-                        <tbody></tbody>
-                    </table>
-                </div>
+            <div class="d-flex gap-2">
+              <button class="btn btn-outline-secondary d-none d-sm-inline-block" id="open-filter-modal-btn" type="button">
+                <i class="fas fa-filter"></i> Filtros
+              </button>
+              <div id="create-project-button-container"></div>
             </div>
+          </div>
+          <div class="card-body">
+            <div id="list-view">
+              <div class="table-responsive">
+                <table class="table table-hover" id="projects-table">
+                  <thead>
+                    <tr>
+                      <th>Nome</th>
+                      <th>Início</th>
+                      <th>Entrega</th>
+                      <th>Responsável</th>
+                      <th>Estado</th>
+                      <th>Progresso</th>
+                      <th>Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+            </div>
+            <div id="calendar-view" class="d-none">
+              <div id="calendar-container"></div>
+            </div>
+            <div id="timeline-view" class="d-none">
+              <div id="timeline-container"></div>
+            </div>
+          </div>
         </div>
 
+        <!-- DETALHE DO PROJETO -->
         <div id="project-detail" class="card d-none">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h5 class="mb-0" id="detail-title">Detalhe do projeto</h5>
-                <button class="btn btn-secondary" id="close-detail">Fechar</button>
-            </div>
-            <div class="card-body" id="detail-body"></div>
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0" id="detail-title">Detalhe do projeto</h5>
+            <button class="btn btn-secondary" id="close-detail">Fechar</button>
+          </div>
+          <div class="card-body" id="detail-body"></div>
         </div>
-    </div>
-</div>
 
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<script src="assets/js/api-client.js"></script>
-<script src="assets/js/app.js"></script>
-</body>
+        <!-- MODAIS: injetados por JS -->
+        <div id="modals-container"></div>
+
+        <!-- MODAL DE FILTROS -->
+        <div class="modal fade" id="filter-modal" tabindex="-1">
+          <div class="modal-dialog">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h5 class="modal-title">Filtros</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+              </div>
+              <div class="modal-body">
+                <div class="mb-3">
+                  <label for="filter-search" class="form-label">Buscar nome</label>
+                  <input type="text" id="filter-search" class="form-control" placeholder="Nome do projeto" />
+                </div>
+                <div class="mb-3">
+                  <label for="filter-state" class="form-label">Estado</label>
+                  <select id="filter-state" class="form-select">
+                    <option value="">Todos</option>
+                    <option value="planificacion">Planejamento</option>
+                    <option value="en_curso">Em curso</option>
+                    <option value="pausado">Pausado</option>
+                    <option value="finalizado">Finalizado</option>
+                  </select>
+                </div>
+                <div class="mb-3">
+                  <label for="filter-responsible" class="form-label">Responsável</label>
+                  <select id="filter-responsible" class="form-select">
+                    <option value="">Todos</option>
+                  </select>
+                </div>
+                <div class="mb-3">
+                  <label for="filter-date-order" class="form-label">Ordem por data de início</label>
+                  <select id="filter-date-order" class="form-select">
+                    <option value="">Padrão</option>
+                    <option value="start_asc">Mais antigo primeiro</option>
+                    <option value="start_desc">Mais recente primeiro</option>
+                  </select>
+                </div>
+                <div class="mb-3">
+                  <label for="filter-deadline-order" class="form-label">Urgência de entrega</label>
+                  <select id="filter-deadline-order" class="form-select">
+                    <option value="">Padrão</option>
+                    <option value="deadline_asc">Prazo mais próximo primeiro (urgentes)</option>
+                    <option value="deadline_desc">Prazo mais longe primeiro (menos urgentes)</option>
+                  </select>
+                </div>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="apply-filters-btn">Aplicar Filtros</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="assets/js/utils/helpers.js"></script>
+    <script src="assets/js/utils/Security.js"></script>
+    <script src="assets/js/components/ProjectDetail.js"></script>
+    <script src="assets/js/components/ProjectRow.js"></script>
+    <script src="assets/js/components/SummaryCards.js"></script>
+    <script src="assets/js/components/modals/ModalCreateProject.js"></script>
+    <script src="assets/js/components/modals/ModalEditProject.js"></script>
+    <script src="assets/js/components/modals/ModalCreateUser.js"></script>
+    <script src="assets/js/api-client.js"></script>
+    <script src="assets/js/auth.js"></script>
+    <script src="assets/js/projects.js"></script>
+    <script src="assets/js/users.js"></script>
+    <script src="assets/js/app.js"></script>
+  </body>
 </html>

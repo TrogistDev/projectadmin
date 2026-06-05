@@ -1,200 +1,135 @@
+
 const App = {
-    user: null,
-    projects: [],
+  user: null,
+  projects: [],
+  users: [],
+  currentProjectId: null,
+  currentView: "list",
 
-    init() {
-        this.bindEvents();
-        this.showLogin();
-    },
+init() {
+    ModalCreateProject.init();
+    ModalEditProject.init();
+    ModalCreateUser.init();
+    this.bindEvents();
 
-    bindEvents() {
-        $('#login-form').on('submit', event => {
-            event.preventDefault();
-            this.handleLogin();
-        });
-
-        $('#logout-button').on('click', () => this.handleLogout());
-        $('#refresh-projects').on('click', () => this.loadProjects());
-        $('#project-search').on('input', () => this.renderProjects());
-        $('#project-state').on('change', () => this.renderProjects());
-        $('#close-detail').on('click', () => this.closeDetail());
-        $('#create-project-button').on('click', () => this.showFeedback('Criação de projeto será implementada no backend.', 'info'));
-    },
-
-    handleLogin() {
-        const email = $('#login-email').val();
-        const password = $('#login-password').val();
-
-        ApiClient.login(email, password)
-            .done(response => {
-                this.user = response.user;
-                this.showDashboard();
-                this.loadProjects();
-            })
-            .fail(xhr => {
-                const message = xhr.responseJSON?.error || 'Erro no login.';
-                this.showFeedback(message, 'danger', '#login-feedback');
-            });
-    },
-
-    handleLogout() {
-        ApiClient.logout().always(() => {
-            this.user = null;
-            this.showLogin();
-        });
-    },
-
-    showLogin() {
-        $('#login-screen').removeClass('d-none');
-        $('#dashboard-screen').addClass('d-none');
-    },
-
-    showDashboard() {
-        $('#login-screen').addClass('d-none');
-        $('#dashboard-screen').removeClass('d-none');
-        this.showFeedback('Bem-vindo(a), ' + this.user.nombre + '!', 'success', '#dashboard-feedback');
-    },
-
-    loadProjects() {
-        ApiClient.getProjects()
-            .done(response => {
-                this.projects = response;
-                this.renderProjects();
-                this.renderSummary();
-            })
-            .fail(xhr => {
-                const message = xhr.responseJSON?.error || 'Erro ao carregar projetos.';
-                this.showFeedback(message, 'danger', '#dashboard-feedback');
-            });
-    },
-
-    renderProjects() {
-        const search = $('#project-search').val().toLowerCase();
-        const status = $('#project-state').val();
-        const rows = this.projects.filter(project => {
-            const matchesName = project.nombre.toLowerCase().includes(search);
-            const matchesStatus = !status || project.estado === status;
-            return matchesName && matchesStatus;
-        }).map(project => {
-            return `
-                <tr>
-                    <td>${project.nombre}</td>
-                    <td>${project.responsable_nombre || project.responsable_id}</td>
-                    <td>${this.statusLabel(project.estado)}</td>
-                    <td>
-                        <div class="progress" style="height: 18px;">
-                            <div class="progress-bar" role="progressbar" style="width: ${project.porcentaje_avance}%" aria-valuenow="${project.porcentaje_avance}" aria-valuemin="0" aria-valuemax="100">${project.porcentaje_avance}%</div>
-                        </div>
-                    </td>
-                    <td><button class="btn btn-sm btn-outline-primary" data-project-id="${project.id}">Ver</button></td>
-                </tr>`;
-        });
-
-        $('#projects-table tbody').html(rows.join(''));
-        $('#projects-table tbody button').on('click', event => {
-            const projectId = $(event.currentTarget).data('project-id');
-            this.openProject(projectId);
-        });
-    },
-
-    renderSummary() {
-        const count = this.projects.reduce((acc, project) => {
-            acc[project.estado] = (acc[project.estado] || 0) + 1;
-            return acc;
-        }, {});
-
-        const labels = [
-            { key: 'planificacion', title: 'Planejamento', color: 'secondary' },
-            { key: 'en_curso', title: 'Em curso', color: 'info' },
-            { key: 'pausado', title: 'Pausado', color: 'warning' },
-            { key: 'finalizado', title: 'Finalizado', color: 'success' }
-        ];
-
-        const cards = labels.map(item => `
-            <div class="col-md-3 mb-2">
-                <div class="card text-white bg-${item.color} h-100">
-                    <div class="card-body">
-                        <h6>${item.title}</h6>
-                        <h3>${count[item.key] || 0}</h3>
-                    </div>
-                </div>
-            </div>
-        `);
-
-        $('#summary-cards').html(cards.join(''));
-    },
-
-    statusLabel(status) {
-        switch (status) {
-            case 'planificacion': return 'Planejamento';
-            case 'en_curso': return 'Em curso';
-            case 'pausado': return 'Pausado';
-            case 'finalizado': return 'Finalizado';
-            default: return status;
+    const savedUser = sessionStorage.getItem('user');
+    if (savedUser) {
+        try {
+            this.user = JSON.parse(savedUser);
+            Auth.showDashboard();
+            Projects.loadProjects();
+            Users.loadUsers();
+            return;
+        } catch (e) {
+            console.warn('Sessão inválida, limpando...', e);
+            sessionStorage.removeItem('user');
         }
-    },
-
-    openProject(projectId) {
-        ApiClient.getProject(projectId)
-            .done(project => {
-                const phases = project.phases.map(phase => `
-                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                        <span>${phase.nombre}</span>
-                        <span class="badge ${phase.completada ? 'bg-success' : 'bg-secondary'}">${phase.completada ? 'Concluída' : 'Aberta'}</span>
-                    </li>
-                `).join('');
-
-                const members = project.members.map(member => `
-                    <li class="list-group-item">${member.nombre} ${member.apellidos} — ${member.rol_especifico}</li>
-                `).join('');
-
-                const html = `
-                    <div class="row">
-                        <div class="col-md-6">
-                            <h5>${project.nombre}</h5>
-                            <p>${project.descripcion}</p>
-                        </div>
-                        <div class="col-md-6">
-                            <p><strong>Estado:</strong> ${this.statusLabel(project.estado)}</p>
-                            <p><strong>Percentual:</strong> ${project.porcentaje_avance}%</p>
-                            <p><strong>Responsável:</strong> ${project.responsable_nombre || project.responsable_id}</p>
-                        </div>
-                    </div>
-                    <hr>
-                    <div class="row">
-                        <div class="col-md-6">
-                            <h6>Fases</h6>
-                            <ul class="list-group">${phases}</ul>
-                        </div>
-                        <div class="col-md-6">
-                            <h6>Equipe</h6>
-                            <ul class="list-group">${members}</ul>
-                        </div>
-                    </div>
-                `;
-
-                $('#detail-body').html(html);
-                $('#project-detail').removeClass('d-none');
-            })
-            .fail(xhr => {
-                const message = xhr.responseJSON?.error || 'Erro ao abrir projeto.';
-                this.showFeedback(message, 'danger', '#dashboard-feedback');
-            });
-    },
-
-    closeDetail() {
-        $('#project-detail').addClass('d-none');
-    },
-
-    showFeedback(message, type = 'info', target = '#login-feedback') {
-        const alert = `
-            <div class="alert alert-${type} alert-dismissible fade show" role="alert">
-                ${message}
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-            </div>
-        `;
-        $(target).html(alert);
     }
+    Auth.showLogin();
+},
+
+  bindEvents() {
+    $("#login-form").on("submit", (e) => { e.preventDefault(); Auth.handleLogin(); });
+    $("#logout-button").on("click", () => Auth.handleLogout());
+    $("#refresh-projects").on("click", () => Projects.loadProjects());
+
+    $("input[name='view-type']").on("change", (event) => {
+      this.currentView = $(event.target).val();
+      this.switchView();
+    });
+
+    $(".card-header").on("click", "#create-project-button", () => Projects.showCreateProjectModal());
+    $("#create-project-form").on("submit", (e) => { e.preventDefault(); Projects.handleCreateProject(); });
+    $("#create-project-modal").on("click", "#add-phase-field-btn", (e) => { e.preventDefault(); Projects.appendPhaseField(); });
+    $("#project-phases-inputs-container").on("click", ".remove-phase-field-btn", (e) => { e.preventDefault(); $(e.target).closest(".dynamic-phase-input").remove(); });
+    
+    $(document).off("submit", "#create-phase-form").on("submit", "#create-phase-form", (e) => { 
+      e.preventDefault(); 
+      Projects.handleCreatePhase(); 
+    });
+
+    $("#admin-users-button").on("click", () => {
+      bootstrap.Modal.getOrCreateInstance(document.getElementById("create-user-modal")).show();
+    });
+    $("#create-user-form").on("submit", (e) => { e.preventDefault(); Users.handleCreateUser(); });
+
+    $("#dashboard-screen").off("click", ".view-project-btn").on("click", ".view-project-btn", (event) => {
+      const id = $(event.target).data("id");
+      if (id) Projects.openProject(id);
+    });
+
+    $("#close-detail").on("click", () => this.closeDetail());
+
+    $("#detail-body").on("click", "#open-edit-project-modal-btn", (event) => {
+      const id = $(event.target).data("id");
+      Projects.showEditProjectModal(id);
+    });
+
+    $("#edit-project-form").on("submit", (e) => { e.preventDefault(); Projects.handleEditProject(); });
+
+    $("#detail-body").on("change", ".toggle-phase-checkbox", (event) => {
+      const $checkbox = $(event.target);
+      const phaseId = $checkbox.data("phase-id");
+      const projectId = $checkbox.data("project-id");
+      const isChecked = $checkbox.is(":checked");
+      Projects.handleTogglePhase(projectId, phaseId, isChecked, $checkbox);
+    });
+
+    $("#dashboard-screen").on("click", ".pause-project-btn", (event) => {
+      event.stopPropagation();
+      const id = $(event.target).data("id");
+      const isCurrentlyPaused = $(event.target).data("paused") === true;
+      Projects.handleTogglePauseProject(id, isCurrentlyPaused);
+    });
+
+    $("#dashboard-screen").on("click", ".delete-project-btn", (event) => {
+      event.stopPropagation();
+      const id = $(event.target).data("id");
+      Projects.handleDeleteProject(id);
+    });
+
+    $("#open-filter-modal-btn").on("click", () => {
+      const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById("filter-modal"));
+      modal.show();
+    });
+
+    $("#apply-filters-btn").on("click", () => {
+      Projects.applyFilters();
+      bootstrap.Modal.getInstance(document.getElementById("filter-modal")).hide();
+    });
+  },
+
+  showLogin() { Auth.showLogin(); },
+  showDashboard() { Auth.showDashboard(); },
+
+  closeDetail() {
+    this.currentProjectId = null;
+    $("#project-detail").addClass("d-none");
+  },
+
+  renderHeaderActions() {
+    const $buttonContainer = $("#create-project-button-container");
+    $buttonContainer.empty();
+    const secObj = window.Security || Security;
+    if (secObj && typeof secObj.canCreateProject === "function") {
+      if (secObj.canCreateProject()) {
+        $buttonContainer.html('<button class="btn btn-primary" id="create-project-button">Novo projeto</button>');
+      }
+    }
+  },
+
+  switchView() {
+    $("#list-view, #calendar-view, #timeline-view").addClass("d-none");
+    $(`#${this.currentView}-view`).removeClass("d-none");
+  },
+
+  showFeedback(message, type = "info", target = "#login-feedback") {
+    $(target).html(`
+      <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>`);
+  }
 };
 
 $(document).ready(() => App.init());

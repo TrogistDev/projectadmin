@@ -5,9 +5,30 @@ declare(strict_types=1);
 namespace Api\Services;
 
 use Api\Database\Database;
+use InvalidArgumentException;
+use PDO;
 
+/**
+ * Service rígido para gerenciamento e manipulação de fases de projetos
+ */
 class PhaseService
 {
+    /**
+     * Retorna uma fase específica por ID para sanar a validação do Controller
+     */
+    public function find(int $id): ?array
+    {
+        $pdo = Database::getConnection();
+        $stmt = $pdo->prepare('SELECT * FROM fases WHERE id = :id LIMIT 1');
+        $stmt->execute(['id' => $id]);
+        $result = $stmt->fetch();
+
+        return $result ?: null;
+    }
+
+    /**
+     * Lista todas as fases vinculadas a um projeto específico ordenadas
+     */
     public function listByProject(int $projectId): array
     {
         $pdo = Database::getConnection();
@@ -17,6 +38,9 @@ class PhaseService
         return $stmt->fetchAll();
     }
 
+    /**
+     * Cria uma nova fase de forma defensiva e retorna o ID inserido
+     */
     public function create(int $projectId, array $data): int
     {
         $this->validatePhaseData($data);
@@ -27,18 +51,18 @@ class PhaseService
              VALUES (:nombre, :descripcion, :orden, 0, :proyecto_id)'
         );
         $stmt->execute([
-            'nombre' => $data['nombre'],
+            'nombre'      => $data['nombre'],
             'descripcion' => $data['descripcion'] ?? '',
-            'orden' => $data['orden'] ?? 1,
+            'orden'       => $data['orden'] ?? 1,
             'proyecto_id' => $projectId,
         ]);
 
-        $phaseId = (int)$pdo->lastInsertId();
-        (new ProjectService())->recalculateStatus($projectId);
-
-        return $phaseId;
+        return (int)$pdo->lastInsertId();
     }
 
+    /**
+     * Atualiza dinamicamente as colunas enviadas mitigando mass assignment indesejado
+     */
     public function update(int $id, array $data): void
     {
         $pdo = Database::getConnection();
@@ -74,58 +98,55 @@ class PhaseService
         $sql = 'UPDATE fases SET ' . implode(', ', $updateFields) . ' WHERE id = :id';
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
-
-        $projectId = $this->getProjectId($id);
-
-        if ($projectId !== null) {
-            (new ProjectService())->recalculateStatus($projectId);
-        }
     }
 
+    /**
+     * Remove uma fase do banco através do ID
+     */
     public function delete(int $id): void
     {
-        $projectId = $this->getProjectId($id);
-        if ($this->isProjectFinalized($projectId)) {
-            throw new \RuntimeException('No se puede eliminar fases de un proyecto finalizado.');
-        }
-
         $pdo = Database::getConnection();
         $stmt = $pdo->prepare('DELETE FROM fases WHERE id = :id');
         $stmt->execute(['id' => $id]);
-
-        if ($projectId !== null) {
-            (new ProjectService())->recalculateStatus($projectId);
-        }
     }
 
-    private function validatePhaseData(array $data): void
-    {
-        if (empty($data['nombre'])) {
-            throw new \InvalidArgumentException('El nombre de la fase es obligatorio.');
-        }
-    }
-
+    /**
+     * Recupera o ID do projeto associado de forma performática
+     */
     public function getProjectId(int $phaseId): ?int
     {
         $pdo = Database::getConnection();
-        $stmt = $pdo->prepare('SELECT proyecto_id FROM fases WHERE id = :id');
+        $stmt = $pdo->prepare('SELECT proyecto_id FROM fases WHERE id = :id LIMIT 1');
         $stmt->execute(['id' => $phaseId]);
         $result = $stmt->fetch();
 
         return $result ? (int)$result['proyecto_id'] : null;
     }
 
-    private function isProjectFinalized(?int $projectId): bool
+    /**
+     * Verifica de forma rígida se o estado do projeto está marcado como concluído
+     */
+    public function isProjectFinalized(?int $projectId): bool
     {
         if ($projectId === null) {
             return false;
         }
 
         $pdo = Database::getConnection();
-        $stmt = $pdo->prepare('SELECT estado FROM proyectos WHERE id = :id');
+        $stmt = $pdo->prepare('SELECT estado FROM proyectos WHERE id = :id LIMIT 1');
         $stmt->execute(['id' => $projectId]);
         $project = $stmt->fetch();
 
         return $project && $project['estado'] === 'finalizado';
+    }
+
+    /**
+     * Validação interna defensiva para integridade de dados das fases
+     */
+    private function validatePhaseData(array $data): void
+    {
+        if (empty($data['nombre']) || trim((string)$data['nombre']) === '') {
+            throw new InvalidArgumentException('El nombre de la fase es obligatorio.');
+        }
     }
 }

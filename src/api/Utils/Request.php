@@ -15,6 +15,11 @@ class Request
         $this->server = $_SERVER;
         $this->query = $this->sanitize($_GET);
         $this->body = $this->parseBody();
+        
+        // RIGOR: Limpeza de memória residual global do PHP
+        $_POST = [];
+        $_GET = [];
+        $_REQUEST = [];
     }
 
     private function parseBody(): array
@@ -35,7 +40,13 @@ class Request
 
         foreach ($data as $key => $value) {
             if (is_string($value)) {
-                $clean[$key] = trim(filter_var($value, FILTER_SANITIZE_STRING, FILTER_FLAG_NO_ENCODE_QUOTES));
+                // 🟢 EXCEÇÃO DE SEGURANÇA: Campos confidenciais de credenciais brutas (senhas/tokens)
+                // NÃO passam por htmlspecialchars para evitar mutação de caracteres válidos.
+                if (in_array($key, ['contrasena', 'password', 'token', 'contrasena_verificar'], true)) {
+                    $clean[$key] = trim($value);
+                } else {
+                    $clean[$key] = trim(htmlspecialchars($value, ENT_QUOTES, 'UTF-8'));
+                }
             } elseif (is_array($value)) {
                 $clean[$key] = $this->sanitize($value);
             } else {

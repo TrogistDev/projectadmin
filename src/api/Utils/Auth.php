@@ -18,8 +18,9 @@ class Auth
     public static function login(array $user): void
     {
         self::start();
-        unset($user['contrasena']);
-        $_SESSION['user'] = $user;
+        $userClean = $user;
+        unset($userClean['contrasena']);
+        $_SESSION['user'] = $userClean;
     }
 
     public static function logout(): void

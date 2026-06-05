@@ -22,6 +22,15 @@ class AuthController
     {
         $data = $request->getBody();
 
+        // Accept both Spanish keys (correo/contrasena) and English keys (email/password)
+        if (isset($data['email']) && !isset($data['correo'])) {
+            $data['correo'] = $data['email'];
+        }
+
+        if (isset($data['password']) && !isset($data['contrasena'])) {
+            $data['contrasena'] = $data['password'];
+        }
+
         if (empty($data['correo']) || empty($data['contrasena'])) {
             Response::error('Correo y contraseña son obligatorios.', 422);
         }

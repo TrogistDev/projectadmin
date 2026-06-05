@@ -14,6 +14,8 @@ class Project
     public string $estado;
     public int $responsable_id;
     public int $porcentaje_avance;
+    public array $phases = [];
+    public array $members = [];
 
     public function __construct(array $data)
     {
@@ -25,5 +27,7 @@ class Project
         $this->estado = $data['estado'];
         $this->responsable_id = (int)$data['responsable_id'];
         $this->porcentaje_avance = (int)$data['porcentaje_avance'];
+        $this->phases = $data['phases'] ?? [];
+        $this->members = $data['members'] ?? [];
     }
 }
