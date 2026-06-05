@@ -81,12 +81,44 @@ body {
 }
 
 /* ============================================
+   DESKTOP (>= 992px): tabela normal com tablehead visível
+   ============================================ */
+@media (min-width: 992px) {
+  #projects-table td,
+  #projects-table th {
+    padding: 0.35rem 0.5rem;
+  }
+
+  #projects-table td[data-label="Descrição"],
+  #projects-table td[data-label="Responsável"] {
+    max-width: 180px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  #projects-table .btn-sm {
+    padding: 0.2rem 0.4rem;
+    font-size: 0.75rem;
+  }
+
+  #projects-table .project-row-progress {
+    height: 18px !important;
+  }
+
+  #projects-table .progress-bar {
+    font-size: 0.7rem;
+  }
+}
+
+/* ============================================
    MOBILE: Tabela de projetos vira cards
    ============================================ */
 @media (max-width: 991px) {
   #projects-table thead {
     display: none;
   }
+
   #projects-table,
   #projects-table tbody,
   #projects-table tr,
@@ -94,6 +126,7 @@ body {
     display: block;
     width: 100%;
   }
+
   #projects-table tr {
     margin-bottom: 0.6rem;
     border: 1px solid #dee2e6;
@@ -101,8 +134,9 @@ body {
     background: #fff;
     padding: 0;
   }
+
   #projects-table td {
-    padding: 0.3rem 0.5rem;
+    padding: 0.4rem 0.5rem;
     border: none;
     text-align: left !important;
     width: 100%;
@@ -111,7 +145,10 @@ body {
     grid-template-columns: 1fr 2fr !important;
     gap: 0.15rem 0.5rem !important;
     align-items: center !important;
+    white-space: normal;
+    overflow: visible;
   }
+
   #projects-table td::before {
     content: attr(data-label);
     font-weight: 600;
@@ -123,70 +160,43 @@ body {
     padding-right: 0.5rem;
     white-space: nowrap;
   }
+
   #projects-table td[data-label="Ações"]::before,
   #projects-table td[data-label="Progresso"]::before {
     display: none;
   }
-  #projects-table td[data-label="Progresso"] {
+
+  #projects-table td[data-label="Progresso"],
+  #projects-table td[data-label="Ações"],
+  #projects-table td[data-label="Estado"] {
     grid-template-columns: 1fr !important;
     width: 100% !important;
+    overflow: visible;
   }
+
   #projects-table td[data-label="Projeto"] {
     font-weight: 700;
     font-size: 1rem;
     padding-top: 0.5rem;
     padding-bottom: 0.35rem;
   }
+
+  #projects-table td[data-label="Projeto"]::before {
+    display: none;
+  }
+
   #projects-table td[data-label="Descrição"] {
     grid-template-columns: 1fr !important;
     max-width: 100% !important;
     width: 100% !important;
-    max-height: 3.2em;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
   }
-  #projects-table td[data-label="Projeto"]::before {
-    display: none;
-  }
-  .project-progress-mobile {
+
+  .project-row-progress {
+    height: 22px !important;
     width: 100% !important;
-    max-width: 100% !important;
-  }
-  .member-row {
-    padding: 0.35rem 0 !important;
-    border-bottom: 1px solid #f1f1f1;
-  }
-  .member-row:last-child {
-    border-bottom: none;
-  }
-  .list-group-item {
-    white-space: normal !important;
-  }
-  .phase-item {
-    flex-wrap: wrap !important;
-  }
-  .project-dashboard-desc {
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-    line-height: 1.4;
-    max-height: 2.8em;
-  }
-  .project-dashboard-desc.expanded {
-    -webkit-line-clamp: unset;
-    max-height: none;
-  }
-  .show-more-btn {
-    background: none;
-    border: none;
-    color: #0d6efd;
-    padding: 0;
-    font-size: 0.8rem;
-    cursor: pointer;
   }
 }
 

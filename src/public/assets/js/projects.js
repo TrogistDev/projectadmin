@@ -17,11 +17,10 @@ const Projects = {
     const search = ($("#filter-search").val() || "").trim();
     const estadoFilter = $("#filter-state").val();
     const responsibleFilter = $("#filter-responsible").val();
-    const isSearching = !!search;
 
     const params = {
       page: this.currentPage,
-      limit: isSearching ? 1000 : this.pageSize,
+      limit: this.pageSize,
     };
 
     if (search) params.search = search;
@@ -277,7 +276,6 @@ const Projects = {
           $("#create-project-feedback").empty();
           this.isSubmitting = false;
           $btn.prop("disabled", false);
-          this.loadProjects();
         }, 1000);
       })
       .fail((xhr) => {
@@ -338,7 +336,6 @@ const Projects = {
           if (modal) modal.hide();
           this.isSubmitting = false;
           $btn.prop("disabled", false);
-          this.loadProjects();
           this.openProject(id);
         }, 1000);
       })
@@ -370,7 +367,6 @@ const Projects = {
       .done(() => {
         App.showFeedback("Projeto deletado com sucesso.", "success", "#dashboard-feedback");
         $(`tr[data-project-id="${id}"]`).fadeOut(300, () => {
-          this.loadProjects();
           if (App.currentProjectId == id) App.closeDetail();
         });
       })
@@ -401,7 +397,6 @@ const Projects = {
         App.showFeedback("Fase adicionada com sucesso!", "success", "#create-phase-feedback");
         $form[0].reset();
         this.openProject(App.currentProjectId);
-        this.loadProjects();
         setTimeout(() => {
           const modal = bootstrap.Modal.getInstance(document.getElementById("create-phase-modal"));
           if (modal) modal.hide();
@@ -423,7 +418,6 @@ const Projects = {
     ApiClient.togglePhase(phaseId, isChecked)
       .done(() => {
         this.openProject(projectId);
-        this.loadProjects();
       })
       .fail((xhr) => {
         checkbox.prop("checked", !isChecked);
@@ -439,7 +433,6 @@ const Projects = {
     ApiClient.updatePhase(phaseId, { orden: newOrder })
       .done(() => {
         this.openProject(projectId);
-        this.loadProjects();
       })
       .fail((xhr) => {
         alert(xhr.responseJSON?.error || "Erro ao reordenar fase.");
@@ -475,7 +468,6 @@ const Projects = {
         .done(() => ApiClient.updatePhase(prevPhaseId, { orden: currentOrder }))
         .done(() => {
           this.openProject(projectId);
-          this.loadProjects();
         })
         .fail((xhr) => {
           alert(xhr.responseJSON?.error || "Erro ao reordenar fase.");
@@ -510,7 +502,6 @@ const Projects = {
         .done(() => ApiClient.updatePhase(nextPhaseId, { orden: currentOrder }))
         .done(() => {
           this.openProject(projectId);
-          this.loadProjects();
         })
         .fail((xhr) => {
           alert(xhr.responseJSON?.error || "Erro ao reordenar fase.");
@@ -533,7 +524,6 @@ const Projects = {
       ApiClient.addMember(projectId, userId, role)
         .done(() => {
           this.openProject(projectId);
-          this.loadProjects();
         })
         .fail((xhr) => {
           alert(xhr.responseJSON?.error || "Erro ao adicionar membro.");
@@ -549,7 +539,6 @@ const Projects = {
       ApiClient.removeMember(projectId, userId)
         .done(() => {
           this.openProject(projectId);
-          this.loadProjects();
         })
         .fail((xhr) => {
           alert(xhr.responseJSON?.error || "Erro ao remover membro.");
@@ -581,7 +570,6 @@ const Projects = {
       ApiClient.createPhase(projectId, phaseData)
         .done(() => {
           this.openProject(projectId);
-          this.loadProjects();
         })
         .fail((xhr) => {
           alert(xhr.responseJSON?.error || "Erro ao adicionar fase.");
@@ -595,7 +583,6 @@ const Projects = {
       ApiClient.deletePhase(phaseId)
         .done(() => {
           this.openProject(App.currentProjectId);
-          this.loadProjects();
         })
         .fail((xhr) => {
           alert(xhr.responseJSON?.error || "Erro ao excluir fase.");

@@ -22,13 +22,8 @@ class UserController
     public function index(Request $request): void
     {
         Auth::requireLogin();
-        try {
-            $users = $this->service->list($request->getQuery());
-            Response::json($users);
-        } catch (\Throwable $e) {
-            error_log('User list error: ' . $e->getMessage());
-            Response::json([]);
-        }
+        $users = $this->service->list($request->getQuery());
+        Response::json($users);
     }
 
     public function create(Request $request): void

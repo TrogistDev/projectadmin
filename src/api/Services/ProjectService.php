@@ -30,8 +30,7 @@ class ProjectService
         $page = isset($filter['page']) && is_numeric($filter['page']) && (int)$filter['page'] > 0 ? (int)$filter['page'] : 1;
         $offset = ($page - 1) * $limit;
 
-        $where = [];
-        $params = [];
+        [$where, $params] = $this->buildWhereClause($filter, $user);
 
         $sql = 'SELECT p.*, u.nombre AS responsable_nombre, u.apellidos AS responsable_apellidos
                 FROM proyectos p
@@ -39,59 +38,6 @@ class ProjectService
 
         if (($user['rol'] ?? '') === 'colaborador') {
             $sql .= ' JOIN proyecto_miembro pm ON pm.proyecto_id = p.id';
-            $where[] = 'pm.usuario_id = :user_id';
-            $params['user_id'] = $user['id'];
-        }
-
-        if (!empty($filter['search'])) {
-            $where[] = 'LOWER(p.nombre) LIKE :search';
-            $params['search'] = '%' . mb_strtolower($filter['search']) . '%';
-        }
-
-        if (!empty($filter['estado'])) {
-            $where[] = 'p.estado = :estado';
-            $params['estado'] = $filter['estado'];
-        }
-
-        if (!empty($filter['responsable_id'])) {
-            $where[] = 'p.responsable_id = :responsable_id';
-            $params['responsable_id'] = (int)$filter['responsable_id'];
-        }
-
-        if (!empty($filter['fecha_inicio'])) {
-            $where[] = 'p.fecha_inicio >= :fecha_inicio';
-            $params['fecha_inicio'] = $filter['fecha_inicio'];
-        }
-
-        if (!empty($filter['fecha_entrega'])) {
-            $where[] = 'p.fecha_entrega <= :fecha_entrega';
-            $params['fecha_entrega'] = $filter['fecha_entrega'];
-        }
-
-        // Filtro de intervalo de datas: projetos que começam OU terminam dentro do intervalo
-        if (!empty($filter['date_start']) || !empty($filter['date_end'])) {
-            $dateConditions = [];
-            $dsIndex = 1;
-            $deIndex = 1;
-
-            if (!empty($filter['date_start']) && !empty($filter['date_end'])) {
-                $dateConditions[] = "(p.fecha_inicio >= :ds1 AND p.fecha_inicio <= :de1)";
-                $dateConditions[] = "(p.fecha_entrega >= :ds2 AND p.fecha_entrega <= :de2)";
-                $params['ds1'] = $filter['date_start'];
-                $params['de1'] = $filter['date_end'];
-                $params['ds2'] = $filter['date_start'];
-                $params['de2'] = $filter['date_end'];
-            } elseif (!empty($filter['date_start'])) {
-                $dateConditions[] = "(p.fecha_inicio >= :ds OR p.fecha_entrega >= :ds)";
-                $params['ds'] = $filter['date_start'];
-            } elseif (!empty($filter['date_end'])) {
-                $dateConditions[] = "(p.fecha_inicio <= :de OR p.fecha_entrega <= :de)";
-                $params['de'] = $filter['date_end'];
-            }
-
-            if (!empty($dateConditions)) {
-                $where[] = '(' . implode(' OR ', $dateConditions) . ')';
-            }
         }
 
         if ($where) {
@@ -124,65 +70,13 @@ class ProjectService
     {
         $pdo = Database::getConnection();
 
-        $where = [];
-        $params = [];
+        [$where, $params] = $this->buildWhereClause($filter, $user);
 
         $sql = 'SELECT estado, COUNT(*) as qtd FROM proyectos p
                 JOIN usuarios u ON u.id = p.responsable_id';
 
         if (($user['rol'] ?? '') === 'colaborador') {
             $sql .= ' JOIN proyecto_miembro pm ON pm.proyecto_id = p.id';
-            $where[] = 'pm.usuario_id = :user_id';
-            $params['user_id'] = $user['id'];
-        }
-
-        if (!empty($filter['search'])) {
-            $where[] = 'LOWER(p.nombre) LIKE :search';
-            $params['search'] = '%' . mb_strtolower($filter['search']) . '%';
-        }
-
-        if (!empty($filter['estado'])) {
-            $where[] = 'p.estado = :estado';
-            $params['estado'] = $filter['estado'];
-        }
-
-        if (!empty($filter['responsable_id'])) {
-            $where[] = 'p.responsable_id = :responsable_id';
-            $params['responsable_id'] = (int)$filter['responsable_id'];
-        }
-
-        if (!empty($filter['fecha_inicio'])) {
-            $where[] = 'p.fecha_inicio >= :fecha_inicio';
-            $params['fecha_inicio'] = $filter['fecha_inicio'];
-        }
-
-        if (!empty($filter['fecha_entrega'])) {
-            $where[] = 'p.fecha_entrega <= :fecha_entrega';
-            $params['fecha_entrega'] = $filter['fecha_entrega'];
-        }
-
-        // Filtro de intervalo de datas
-        if (!empty($filter['date_start']) || !empty($filter['date_end'])) {
-            $dateConditions = [];
-
-            if (!empty($filter['date_start']) && !empty($filter['date_end'])) {
-                $dateConditions[] = "(p.fecha_inicio >= :ds1 AND p.fecha_inicio <= :de1)";
-                $dateConditions[] = "(p.fecha_entrega >= :ds2 AND p.fecha_entrega <= :de2)";
-                $params['ds1'] = $filter['date_start'];
-                $params['de1'] = $filter['date_end'];
-                $params['ds2'] = $filter['date_start'];
-                $params['de2'] = $filter['date_end'];
-            } elseif (!empty($filter['date_start'])) {
-                $dateConditions[] = "(p.fecha_inicio >= :ds OR p.fecha_entrega >= :ds)";
-                $params['ds'] = $filter['date_start'];
-            } elseif (!empty($filter['date_end'])) {
-                $dateConditions[] = "(p.fecha_inicio <= :de OR p.fecha_entrega <= :de)";
-                $params['de'] = $filter['date_end'];
-            }
-
-            if (!empty($dateConditions)) {
-                $where[] = '(' . implode(' OR ', $dateConditions) . ')';
-            }
         }
 
         if ($where) {
@@ -215,14 +109,34 @@ class ProjectService
     {
         $pdo = Database::getConnection();
 
-        $where = [];
-        $params = [];
+        [$where, $params] = $this->buildWhereClause($filter, $user);
 
         $sql = 'SELECT COUNT(*) FROM proyectos p
                 JOIN usuarios u ON u.id = p.responsable_id';
 
         if (($user['rol'] ?? '') === 'colaborador') {
             $sql .= ' JOIN proyecto_miembro pm ON pm.proyecto_id = p.id';
+        }
+
+        if ($where) {
+            $sql .= ' WHERE ' . implode(' AND ', $where);
+        }
+
+        $stmt = $pdo->prepare($sql);
+        foreach ($params as $key => $value) {
+            $stmt->bindValue(':' . $key, $value);
+        }
+        $stmt->execute();
+
+        return (int)$stmt->fetchColumn();
+    }
+
+    private function buildWhereClause(array $filter, array $user): array
+    {
+        $where = [];
+        $params = [];
+
+        if (($user['rol'] ?? '') === 'colaborador') {
             $where[] = 'pm.usuario_id = :user_id';
             $params['user_id'] = $user['id'];
         }
@@ -252,7 +166,7 @@ class ProjectService
             $params['fecha_entrega'] = $filter['fecha_entrega'];
         }
 
-        // Filtro de intervalo de datas
+        // Filtro de intervalo de datas: projetos que começam OU terminam dentro do intervalo
         if (!empty($filter['date_start']) || !empty($filter['date_end'])) {
             $dateConditions = [];
 
@@ -264,11 +178,13 @@ class ProjectService
                 $params['ds2'] = $filter['date_start'];
                 $params['de2'] = $filter['date_end'];
             } elseif (!empty($filter['date_start'])) {
-                $dateConditions[] = "(p.fecha_inicio >= :ds OR p.fecha_entrega >= :ds)";
-                $params['ds'] = $filter['date_start'];
+                $dateConditions[] = "(p.fecha_inicio >= :ds1 OR p.fecha_entrega >= :ds2)";
+                $params['ds1'] = $filter['date_start'];
+                $params['ds2'] = $filter['date_start'];
             } elseif (!empty($filter['date_end'])) {
-                $dateConditions[] = "(p.fecha_inicio <= :de OR p.fecha_entrega <= :de)";
-                $params['de'] = $filter['date_end'];
+                $dateConditions[] = "(p.fecha_inicio <= :de1 OR p.fecha_entrega <= :de2)";
+                $params['de1'] = $filter['date_end'];
+                $params['de2'] = $filter['date_end'];
             }
 
             if (!empty($dateConditions)) {
@@ -276,17 +192,7 @@ class ProjectService
             }
         }
 
-        if ($where) {
-            $sql .= ' WHERE ' . implode(' AND ', $where);
-        }
-
-        $stmt = $pdo->prepare($sql);
-        foreach ($params as $key => $value) {
-            $stmt->bindValue(':' . $key, $value);
-        }
-        $stmt->execute();
-
-        return (int)$stmt->fetchColumn();
+        return [$where, $params];
     }
 
     public function find(int $id): array|false
@@ -332,7 +238,6 @@ class ProjectService
 
             $projectId = (int)$pdo->lastInsertId();
 
-            // RÍGIDO: Insere automaticamente o Jefe Responsável na equipe do projeto
             $stmtManager = $pdo->prepare(
                 'INSERT INTO proyecto_miembro (proyecto_id, usuario_id, fecha_add, rol_especifico)
                  VALUES (:proyecto_id, :usuario_id, :fecha_add, :rol_especifico)'
@@ -344,7 +249,6 @@ class ProjectService
                 'rol_especifico' => 'Jefe de Proyecto'
             ]);
 
-            // Persistência das fases iniciais
             $rawPhases = $data['phases'] ?? ($data['fases'] ?? []);
             if (!empty($rawPhases) && is_array($rawPhases)) {
                 $stmtPhase = $pdo->prepare(
@@ -373,7 +277,6 @@ class ProjectService
                 }
             }
 
-            // Persistência dos membros adicionais vindos do formulário
             $rawMembers = $data['members'] ?? ($data['miembros'] ?? ($data['membros'] ?? []));
             if (!empty($rawMembers) && is_array($rawMembers)) {
                 $stmtMember = $pdo->prepare(
@@ -384,7 +287,6 @@ class ProjectService
                 foreach ($rawMembers as $member) {
                     $userId = isset($member['usuario_id']) ? (int)$member['usuario_id'] : (isset($member['id']) ? (int)$member['id'] : null);
 
-                    // Evita duplicar o próprio responsável que foi inserido acima
                     if (!$userId || $userId === (int)$data['responsable_id']) {
                         continue;
                     }
@@ -446,27 +348,16 @@ class ProjectService
 
     public function delete(int $id): void
     {
-        $pdo = Database::getConnection();
-        $pdo->beginTransaction();
-
-        try {
-            // 1. Elimina vínculos de equipe
+        Database::transaction(function (PDO $pdo) use ($id) {
             $stmt1 = $pdo->prepare('DELETE FROM proyecto_miembro WHERE proyecto_id = :id');
             $stmt1->execute(['id' => $id]);
 
-            // 2. Elimina fases vinculadas
             $stmt2 = $pdo->prepare('DELETE FROM fases WHERE proyecto_id = :id');
             $stmt2->execute(['id' => $id]);
 
-            // 3. Elimina a entidade raiz do projeto
             $stmt3 = $pdo->prepare('DELETE FROM proyectos WHERE id = :id');
             $stmt3->execute(['id' => $id]);
-
-            $pdo->commit();
-        } catch (Throwable $e) {
-            $pdo->rollBack();
-            throw $e;
-        }
+        });
     }
 
     public function recalculateStatus(int $projectId): void
@@ -544,3 +435,4 @@ class ProjectService
         }
     }
 }
+

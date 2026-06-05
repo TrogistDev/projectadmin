@@ -13,7 +13,31 @@ class UserService
     public function list(array $filter = []): array
     {
         $pdo = Database::getConnection();
-        $stmt = $pdo->prepare('SELECT id, nombre, apellidos, correo, rol, departamento FROM usuarios');
+
+        $limit = isset($filter['limit']) && is_numeric($filter['limit']) ? (int)$filter['limit'] : 50;
+        $page = isset($filter['page']) && is_numeric($filter['page']) && (int)$filter['page'] > 0 ? (int)$filter['page'] : 1;
+        $offset = ($page - 1) * $limit;
+
+        $where = [];
+        $params = [];
+
+        if (!empty($filter['search'])) {
+            $where[] = '(nombre LIKE :search OR apellidos LIKE :search OR correo LIKE :search)';
+            $params['search'] = '%' . $filter['search'] . '%';
+        }
+
+        $sql = 'SELECT id, nombre, apellidos, correo, rol, departamento FROM usuarios';
+        if ($where) {
+            $sql .= ' WHERE ' . implode(' AND ', $where);
+        }
+        $sql .= ' ORDER BY nombre ASC LIMIT :limit OFFSET :offset';
+
+        $stmt = $pdo->prepare($sql);
+        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+        foreach ($params as $key => $value) {
+            $stmt->bindValue(':' . $key, $value);
+        }
         $stmt->execute();
 
         return $stmt->fetchAll();

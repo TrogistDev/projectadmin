@@ -111,14 +111,14 @@ class PhaseService
         try {
             $projectId = $this->getProjectId($id);
 
+            $stmtOrder = $pdo->prepare('SELECT orden FROM fases WHERE id = :id LIMIT 1');
+            $stmtOrder->execute(['id' => $id]);
+            $deletedOrder = (int)$stmtOrder->fetchColumn();
+
             $stmtDelete = $pdo->prepare('DELETE FROM fases WHERE id = :id');
             $stmtDelete->execute(['id' => $id]);
 
-            if ($projectId !== null) {
-                $stmtOrder = $pdo->prepare('SELECT orden FROM fases WHERE id = :id LIMIT 1');
-                $stmtOrder->execute(['id' => $id]);
-                $deletedOrder = (int)$stmtOrder->fetchColumn();
-
+            if ($projectId !== null && $deletedOrder > 0) {
                 $stmtRenumber = $pdo->prepare('UPDATE fases SET orden = orden - 1 WHERE proyecto_id = :projectId AND orden > :deletedOrder');
                 $stmtRenumber->execute(['projectId' => $projectId, 'deletedOrder' => $deletedOrder]);
             }

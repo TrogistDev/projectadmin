@@ -107,10 +107,7 @@ const Users = {
 
   renderUsersList() {
     const users = App.users || [];
-    const isMobile = window.innerWidth < 768;
-
-    if (isMobile) {
-      const cardsHtml = users.map(u => `
+    const cardsHtml = users.map(u => `
         <div class="card mb-2 user-card-mobile" data-user-id="${u.id}">
           <div class="card-body p-3">
             <div class="d-flex justify-content-between align-items-start mb-2">
@@ -129,46 +126,7 @@ const Users = {
           </div>
         </div>
       `).join("");
-      $("#users-list-container").html(cardsHtml || '<p class="text-muted p-2">Nenhum usuario cadastrado.</p>');
-    } else {
-      const html = `
-        <table class="table table-sm table-hover">
-          <thead>
-            <tr>
-              <th>Nombre</th>
-              <th>Apellido</th>
-              <th>Correo</th>
-              <th>Rol</th>
-              <th>Departamento</th>
-              <th>Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${users.map(u => `
-              <tr data-user-id="${u.id}">
-                <td>${u.nombre}</td>
-                <td>${u.apellidos}</td>
-                <td>${u.correo}</td>
-                <td>
-                  <select class="form-select form-select-sm user-role-select" data-user-id="${u.id}">
-                    <option value="colaborador" ${u.rol === 'colaborador' ? 'selected' : ''}>Colaborador</option>
-                    <option value="jefe_proyecto" ${u.rol === 'jefe_proyecto' ? 'selected' : ''}>Jefe de Proyecto</option>
-                    <option value="administrador" ${u.rol === 'administrador' ? 'selected' : ''}>Administrador</option>
-                  </select>
-                </td>
-                <td>${u.departamento || '-'}</td>
-                <td>
-                  <button class="btn btn-sm btn-outline-danger delete-user-btn" data-user-id="${u.id}">
-                    <i class="fas fa-trash"></i>
-                  </button>
-                </td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-      `;
-      $("#users-list-container").html(html || '<p class="text-muted p-2">Nenhum usuario cadastrado.</p>');
-    }
+    $("#users-list-container").html(cardsHtml || '<p class="text-muted p-2">Nenhum usuario cadastrado.</p>');
   },
 
   bindUsersEvents() {

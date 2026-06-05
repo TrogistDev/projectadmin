@@ -7,6 +7,7 @@ namespace Api\Database;
 use Api\Utils\Response;
 use PDO;
 use PDOException;
+use Throwable;
 
 class Database
 {
@@ -43,5 +44,20 @@ class Database
         }
 
         return self::$instance;
+    }
+
+    public static function transaction(callable $fn): mixed
+    {
+        $pdo = self::getConnection();
+        $pdo->beginTransaction();
+
+        try {
+            $result = $fn($pdo);
+            $pdo->commit();
+            return $result;
+        } catch (Throwable $e) {
+            $pdo->rollBack();
+            throw $e;
+        }
     }
 }

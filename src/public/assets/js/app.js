@@ -51,12 +51,19 @@ const App = {
     $("#create-user-form").on("submit", (e) => { e.preventDefault(); Users.handleCreateUser(); });
 
     $("#dashboard-screen").on("click", ".view-project-btn", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
       const id = $(event.target).data("id");
       if (id) {
         Projects.openProject(id);
-        $('html, body').animate({
-          scrollTop: $("#project-detail").offset().top - 20
-        }, 500);
+        setTimeout(() => {
+          const $detail = $("#project-detail");
+          if ($detail.length && !$detail.hasClass("d-none")) {
+            $('html, body').animate({
+              scrollTop: $detail.offset().top - 20
+            }, 400);
+          }
+        }, 150);
       }
     });
 
