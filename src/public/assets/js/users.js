@@ -7,8 +7,14 @@ const Users = {
         App.users = Array.isArray(users) ? users : [];
         this.populateResponsibleSelect();
         this.populateMembersCheckboxes();
+        if (typeof Projects.populateResponsibleFilter === 'function') {
+          Projects.populateResponsibleFilter();
+        }
+        if ($("#users-list-container").length) {
+          this.renderUsersList();
+        }
       })
-      .fail(() => console.warn("Não foi possível carregar os usuários da API"));
+      .fail(() => {});
   },
 
   populateResponsibleSelect() {
@@ -36,21 +42,18 @@ const Users = {
       const safeId = parseInt(u.id);
       const safeName = String(u.nombre).replace(/[/<>]/g, "");
       const safeLastname = String(u.apellidos).replace(/[/<>]/g, "");
-      const roleOptionsHtml = roleOptions
-        .map(r => `<option value="${r}">${r}</option>`)
-        .join("");
       return `
-        <div class="border-bottom pb-2 mb-2 member-row">
+        <div class="member-row">
           <div class="form-check">
             <input class="form-check-input project-member-checkbox" type="checkbox" value="${safeId}" id="member-chk-${safeId}" onchange="Users.onMemberChecked(this)">
-            <label class="form-check-label text-truncate" for="member-chk-${safeId}" style="max-width:90%;">
+            <label class="form-check-label text-truncate" for="member-chk-${safeId}">
               ${safeName} ${safeLastname}
-              <span class="badge bg-light text-dark font-monospace" style="font-size:0.75rem;">${u.rol}</span>
+              <span class="badge bg-light text-dark font-monospace ms-1" style="font-size:0.75rem;">${u.rol}</span>
             </label>
           </div>
-          <div class="ms-4 mt-1 d-none member-role-select-wrapper">
+          <div class="mt-1 member-role-select-wrapper">
             <select class="form-select form-select-sm member-role-select" data-user-id="${safeId}" style="max-width:220px;">
-              ${roleOptionsHtml}
+              ${roleOptions.map(r => `<option value="${r}">${r}</option>`).join("")}
             </select>
           </div>
         </div>`;
@@ -85,22 +88,116 @@ const Users = {
 
     ApiClient.createUser(userData)
       .done(() => {
-        App.showFeedback("Usuário cadastrado com sucesso!", "success", "#create-user-feedback");
+        App.showFeedback("Usuario cadastrado com sucesso!", "success", "#create-user-feedback");
         $form[0].reset();
+        this.loadUsers();
         setTimeout(() => {
-          const modal = bootstrap.Modal.getInstance(document.getElementById("create-user-modal"));
-          if (modal) modal.hide();
           $("#create-user-feedback").empty();
           this.isSubmitting = false;
           $btn.prop("disabled", false);
-          this.loadUsers();
         }, 1200);
       })
       .fail((xhr) => {
-        const msg = xhr.responseJSON?.error || "Erro ao criar usuário.";
+        const msg = xhr.responseJSON?.error || "Error al crear usuario.";
         App.showFeedback(msg, "danger", "#create-user-feedback");
         this.isSubmitting = false;
         $btn.prop("disabled", false);
       });
+  },
+
+  renderUsersList() {
+    const users = App.users || [];
+    const isMobile = window.innerWidth < 768;
+
+    if (isMobile) {
+      const cardsHtml = users.map(u => `
+        <div class="card mb-2 user-card-mobile" data-user-id="${u.id}">
+          <div class="card-body p-3">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+              <h6 class="card-title mb-0">${u.nombre} ${u.apellidos}</h6>
+              <button class="btn btn-sm btn-outline-danger delete-user-btn" data-user-id="${u.id}">
+                <i class="fas fa-trash"></i>
+              </button>
+            </div>
+            <p class="card-text small text-muted mb-2">${u.correo}</p>
+            <select class="form-select form-select-sm user-role-select" data-user-id="${u.id}">
+              <option value="colaborador" ${u.rol === 'colaborador' ? 'selected' : ''}>Colaborador</option>
+              <option value="jefe_proyecto" ${u.rol === 'jefe_proyecto' ? 'selected' : ''}>Jefe de Proyecto</option>
+              <option value="administrador" ${u.rol === 'administrador' ? 'selected' : ''}>Administrador</option>
+            </select>
+            ${u.departamento ? `<p class="card-text small mt-2 mb-0"><strong>Depto:</strong> ${u.departamento}</p>` : ''}
+          </div>
+        </div>
+      `).join("");
+      $("#users-list-container").html(cardsHtml || '<p class="text-muted p-2">Nenhum usuario cadastrado.</p>');
+    } else {
+      const html = `
+        <table class="table table-sm table-hover">
+          <thead>
+            <tr>
+              <th>Nombre</th>
+              <th>Apellido</th>
+              <th>Correo</th>
+              <th>Rol</th>
+              <th>Departamento</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${users.map(u => `
+              <tr data-user-id="${u.id}">
+                <td>${u.nombre}</td>
+                <td>${u.apellidos}</td>
+                <td>${u.correo}</td>
+                <td>
+                  <select class="form-select form-select-sm user-role-select" data-user-id="${u.id}">
+                    <option value="colaborador" ${u.rol === 'colaborador' ? 'selected' : ''}>Colaborador</option>
+                    <option value="jefe_proyecto" ${u.rol === 'jefe_proyecto' ? 'selected' : ''}>Jefe de Proyecto</option>
+                    <option value="administrador" ${u.rol === 'administrador' ? 'selected' : ''}>Administrador</option>
+                  </select>
+                </td>
+                <td>${u.departamento || '-'}</td>
+                <td>
+                  <button class="btn btn-sm btn-outline-danger delete-user-btn" data-user-id="${u.id}">
+                    <i class="fas fa-trash"></i>
+                  </button>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+      $("#users-list-container").html(html || '<p class="text-muted p-2">Nenhum usuario cadastrado.</p>');
+    }
+  },
+
+  bindUsersEvents() {
+    $("#users-list-container").off("change", ".user-role-select").on("change", ".user-role-select", (e) => {
+      const $select = $(e.target);
+      const userId = $select.data("user-id");
+      const newRole = $select.val();
+
+      ApiClient.updateUser(userId, { rol: newRole })
+        .done(() => {
+          App.showFeedback("Rol actualizado com sucesso!", "success", "#create-user-feedback");
+        })
+        .fail((xhr) => {
+          const msg = xhr.responseJSON?.message || xhr.responseJSON?.error || "Error al actualizar rol.";
+          App.showFeedback(msg, "danger", "#create-user-feedback");
+        });
+    });
+
+    $("#users-list-container").off("click", ".delete-user-btn").on("click", ".delete-user-btn", (e) => {
+      const userId = $(e.target).data("user-id");
+      if (!confirm("¿Está seguro de eliminar este usuario?")) return;
+
+      ApiClient.deleteUser(userId)
+        .done(() => {
+          this.loadUsers();
+        })
+        .fail((xhr) => {
+          alert(xhr.responseJSON?.error || "Error al eliminar usuario.");
+        });
+    });
   }
 };

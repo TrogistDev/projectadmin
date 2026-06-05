@@ -1,24 +1,17 @@
-// ❌ REMOVA: export const Security = {
-//  ALTERE PARA:
 const Security = {
-    // Traz a role do usuário atualmente logado armazenada com segurança
     getCurrentRole() {
         try {
             const sessionData = sessionStorage.getItem('user');
             if (!sessionData) return 'colaborador';
-            
             const user = JSON.parse(sessionData);
             return user.rol || user.role || 'colaborador';
         } catch (e) {
-            console.error("Erro ao ler credenciais do escopo de sessão:", e);
             return 'colaborador';
         }
     },
 
-    // Espelho rígido das permissões do Backend
     canCreateProject() {
-        const role = this.getCurrentRole();
-        return role === 'administrador' || role === 'jefe_proyecto';
+        return this.getCurrentRole() === 'administrador' || this.getCurrentRole() === 'jefe_proyecto';
     },
 
     canManageUsers() {
@@ -44,5 +37,4 @@ const Security = {
     }
 };
 
-// Se precisar expor globalmente caso os scripts estejam isolados:
 window.Security = Security;

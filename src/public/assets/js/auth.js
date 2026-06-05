@@ -7,11 +7,8 @@ const Auth = {
 
     ApiClient.login(email, password)
       .done((response) => {
-        console.log("Resposta do servidor no Login:", response);
-
         if (!response || !response.user) {
-          console.error("Erro Estrutural: Objeto 'user' não encontrado na resposta.");
-          App.showFeedback("Erro interno: Payload de autenticação inválido.", "danger", "#login-feedback");
+          App.showFeedback('Erro interno: Payload de autenticação inválido.', "danger", "#login-feedback");
           return;
         }
 
@@ -23,16 +20,11 @@ const Auth = {
 
         sessionStorage.setItem("user", JSON.stringify(App.user));
 
-        try {
-          App.showDashboard();
-          Projects.loadProjects();
-          Users.loadUsers();
-        } catch (uiError) {
-          console.error("Falha crítica ao renderizar Dashboard:", uiError);
-        }
+        Auth.showDashboard();
+        Projects.loadProjects();
+        Users.loadUsers();
       })
       .fail((xhr) => {
-        console.error("Falha na requisição de login:", xhr);
         const msg = xhr.responseJSON?.error || "Erro no login ou credenciais incorretas.";
         App.showFeedback(msg, "danger", "#login-feedback");
       });
@@ -43,6 +35,7 @@ const Auth = {
     $("#dashboard-screen").removeClass("d-none");
     $("#login-feedback").empty();
     $("#create-project-feedback").empty();
+    window.scrollTo(0, 0);
 
     if (App.user && String(App.user.rol).toLowerCase() === "administrador") {
       $("#admin-users-button").removeClass("d-none");
@@ -53,7 +46,7 @@ const Auth = {
     try {
       App.renderHeaderActions();
     } catch (err) {
-      console.error("Falha ao renderizar botões de ação:", err);
+      App.showFeedback("Erro ao carregar ações do usuário.", "danger", "#dashboard-feedback");
     }
 
     App.showFeedback(`Bem-vindo(a), ${App.user.nombre}!`, "success", "#dashboard-feedback");
@@ -74,12 +67,13 @@ const Auth = {
       $("#login-form")[0].reset();
 
       App.closeDetail();
-      App.showLogin();
+      Auth.showLogin();
     });
   },
 
   showLogin() {
     $("#login-screen").removeClass("d-none");
     $("#dashboard-screen").addClass("d-none");
+    window.scrollTo(0, 0);
   }
 };

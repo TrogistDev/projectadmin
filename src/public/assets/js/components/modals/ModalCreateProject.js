@@ -57,8 +57,10 @@ const ModalCreateProject = {
                     </button>
                   </label>
                   <div id="project-phases-inputs-container">
-                    <div class="input-group mb-2 dynamic-phase-input">
-                      <input type="text" class="form-control form-control-sm" placeholder="Ex: Planejamento" required />
+                    <div class="dynamic-phase-input input-group mb-2">
+                      <input type="text" class="form-control form-control-sm phase-name-input mb-1" placeholder="Ex: Planejamento" required />
+                      <textarea class="form-control form-control-sm phase-desc-input mb-1" rows="2" placeholder="Descrição da fase (opcional)"></textarea>
+                      <button class="btn btn-outline-danger btn-sm remove-phase-field-btn" type="button">×</button>
                     </div>
                   </div>
                 </div>

@@ -2,21 +2,90 @@
 
 declare(strict_types=1);
 
-// 1. CONFIGURAÇÕES RÍGIDAS DE SESSÃO E COOKIES (CHECKLIST ACERTADO)
-ini_set('session.cookie_httponly', '1');
-ini_set('session.use_only_cookies', '1');
-ini_set('session.cookie_samesite', 'Lax');
-ini_set('session.cookie_path', '/');
-ini_set('session.gc_maxlifetime', '28800'); // 8h
-ini_set('session.cookie_lifetime', '28800'); // cookie persiste 8h
+require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/autoload.php';
 
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
+use Api\Utils\Auth;
+use Api\Utils\Response;
+
+Auth::start();
+
+$method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+$path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?? '/';
+
+$routes = [
+    'GET|/api/login' => ['Api\Controllers\AuthController', 'loginForm'],
+    'POST|/api/login' => ['Api\Controllers\AuthController', 'login'],
+    'POST|/api/logout' => ['Api\Controllers\AuthController', 'logout'],
+    'GET|/api/users' => ['Api\Controllers\UserController', 'index'],
+    'POST|/api/users' => ['Api\Controllers\UserController', 'create'],
+    'PUT|/api/users/([0-9]+)' => ['Api\Controllers\UserController', 'update'],
+    'DELETE|/api/users/([0-9]+)' => ['Api\Controllers\UserController', 'delete'],
+    'GET|/api/projects' => ['Api\Controllers\ProjectController', 'index'],
+    'GET|/api/projects/([0-9]+)' => ['Api\Controllers\ProjectController', 'show'],
+    'POST|/api/projects' => ['Api\Controllers\ProjectController', 'create'],
+    'PUT|/api/projects/([0-9]+)' => ['Api\Controllers\ProjectController', 'update'],
+    'DELETE|/api/projects/([0-9]+)' => ['Api\Controllers\ProjectController', 'delete'],
+    'GET|/api/projects/([0-9]+)/members' => ['Api\Controllers\MemberController', 'listByProject'],
+    'POST|/api/projects/([0-9]+)/members' => ['Api\Controllers\MemberController', 'add'],
+    'DELETE|/api/projects/([0-9]+)/members/([0-9]+)' => ['Api\Controllers\MemberController', 'remove'],
+    'GET|/api/projects/([0-9]+)/phases' => ['Api\Controllers\PhaseController', 'list'],
+    'POST|/api/projects/([0-9]+)/phases' => ['Api\Controllers\PhaseController', 'create'],
+    'PUT|/api/phases/([0-9]+)' => ['Api\Controllers\PhaseController', 'update'],
+    'DELETE|/api/phases/([0-9]+)' => ['Api\Controllers\PhaseController', 'delete'],
+];
+
+$matched = false;
+
+foreach ($routes as $pattern => $handler) {
+    [$httpMethod, $routePattern] = explode('|', $pattern, 2);
+
+    if ($method !== $httpMethod) {
+        continue;
+    }
+
+    if (preg_match('#^' . $routePattern . '$#', $path, $matches)) {
+        [$controllerClass, $methodName] = $handler;
+        array_shift($matches);
+
+        try {
+            $controller = new $controllerClass();
+            $reflection = new ReflectionMethod($controller, $methodName);
+            $params = $reflection->getParameters();
+
+            $resolvedParams = [];
+            foreach ($params as $param) {
+                $type = $param->getType();
+                $className = ($type instanceof \ReflectionNamedType) ? $type->getName() : null;
+
+                if ($className && class_exists($className)) {
+                    $resolvedParams[] = new $className();
+                } else {
+                    $value = array_shift($matches);
+                    $resolvedParams[] = $value !== null ? (int)$value : null;
+                }
+            }
+
+            $reflection->invokeArgs($controller, $resolvedParams);
+            $matched = true;
+            break;
+        } catch (\InvalidArgumentException $e) {
+            Response::error($e->getMessage(), 422);
+        } catch (\RuntimeException $e) {
+            Response::error($e->getMessage(), 400);
+        } catch (\Throwable $e) {
+            Response::error('Erro interno no servidor.', 500);
+        }
+    }
 }
 
-// 2. MIDDLEWARE CORS DE SEGURANÇA PARA CREDENCIAIS
+if (!$matched) {
+    Response::error('Rota no encontrada.', 404);
+}
+
+// Middleware CORS
 $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
-$allowedOrigins = ['http://localhost:8000', 'http://127.0.0.1:8000', 'http://localhost:3000']; 
+$allowedOrigins = ['http://localhost:8000', 'http://127.0.0.1:8000', 'http://localhost:3000'];
 
 if (in_array($origin, $allowedOrigins, true)) {
     header("Access-Control-Allow-Origin: $origin");
@@ -25,100 +94,7 @@ if (in_array($origin, $allowedOrigins, true)) {
     header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
 }
 
-// Interrupção imediata de Preflight OPTIONS para blindagem de tráfego
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'OPTIONS') {
     http_response_code(204);
-    exit;
-}
-
-require_once __DIR__ . '/autoload.php';
-require_once __DIR__ . '/config.php';
-
-use Api\Utils\Request;
-use Api\Utils\Response;
-
-$isApi = str_starts_with($_SERVER['REQUEST_URI'] ?? '', '/api');
-
-if ($isApi) {
-    try {
-        $request = new Request();
-        $method = $request->getMethod();
-        $path = rtrim($request->getPath(), '/');
-
-        // =================================================================
-        // ROTAS DE AUTENTICAÇÃO (Abertas)
-        // =================================================================
-        if ($path === '/api/login' && $method === 'POST') {
-            (new Api\Controllers\AuthController())->login($request);
-            exit;
-        }
-        if ($path === '/api/logout' && $method === 'POST') {
-            (new Api\Controllers\AuthController())->logout();
-            exit;
-        }
-
-        // =================================================================
-        // ROTAS PROTEGIDAS (A validação de sessão ocorre dentro dos Controllers)
-        // =================================================================
-        if ($path === '/api/users' && $method === 'GET') {
-            (new Api\Controllers\UserController())->index($request);
-            exit;
-        }
-        if ($path === '/api/users' && $method === 'POST') {
-            (new Api\Controllers\UserController())->create($request);
-            exit;
-        }
-
-        // Rotas de Projetos
-        if (preg_match('#^/api/projects$#', $path)) {
-            $controller = new Api\Controllers\ProjectController();
-            $method === 'GET' ? $controller->index($request) : $controller->create($request);
-            exit;
-        }
-        if (preg_match('#^/api/projects/([0-9]+)$#', $path, $matches)) {
-            $controller = new Api\Controllers\ProjectController();
-            $id = (int)$matches[1];
-            if ($method === 'GET') $controller->show($id);
-            if ($method === 'PUT') $controller->update($id, $request);
-            if ($method === 'DELETE') $controller->delete($id);
-            exit;
-        }
-
-        // Rotas de Membros
-        if (preg_match('#^/api/projects/([0-9]+)/members/([0-9]+)$#', $path, $matches)) {
-            if ($method === 'DELETE') (new Api\Controllers\MemberController())->remove((int)$matches[1], (int)$matches[2]);
-            exit;
-        }
-        if (preg_match('#^/api/projects/([0-9]+)/members$#', $path, $matches)) {
-            $controller = new Api\Controllers\MemberController();
-            $id = (int)$matches[1];
-            $method === 'GET' ? $controller->list($id) : $controller->add($id, $request);
-            exit;
-        }
-
-        // Rotas de Fases
-        if (preg_match('#^/api/projects/([0-9]+)/phases$#', $path, $matches)) {
-            $controller = new Api\Controllers\PhaseController();
-            $id = (int)$matches[1];
-            $method === 'GET' ? $controller->list($id) : $controller->create($id, $request);
-            exit;
-        }
-        if (preg_match('#^/api/phases/([0-9]+)$#', $path, $matches)) {
-            $controller = new Api\Controllers\PhaseController();
-            $id = (int)$matches[1];
-            if ($method === 'PUT') $controller->update($id, $request);
-            if ($method === 'DELETE') $controller->delete($id);
-            exit;
-        }
-
-        Response::error('Endpoint not found', 404);
-
-    } catch (\InvalidArgumentException $e) {
-        Response::error($e->getMessage(), 422);
-    } catch (\RuntimeException $e) {
-        Response::error($e->getMessage(), 400);
-    } catch (\Throwable $e) {
-        Response::error('Erro interno no servidor.', 500);
-    }
     exit;
 }

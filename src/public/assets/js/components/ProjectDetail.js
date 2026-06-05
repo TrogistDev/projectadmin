@@ -4,41 +4,41 @@ const ProjectDetail = {
   render(project) {
     const currentUser = JSON.parse(sessionStorage.getItem('user')) || {};
     
-    // Verifica se o usuário logado tem direito de editar o projeto (Admin ou o próprio Chefe Responsável)
     const canEdit = currentUser.rol === 'administrador' || 
                     (currentUser.rol === 'jefe_proyecto' && project.responsable_id == currentUser.id);
 
-    // Verifica se pode reordenar fases (Admin, Jefe do projeto, ou Colaborador membro)
+    const canManageTeam = currentUser.rol === 'administrador' || currentUser.rol === 'jefe_proyecto';
+
     const canReorderPhases = (currentUser.rol === 'administrador') || 
                              (currentUser.rol === 'jefe_proyecto' && project.responsable_id == currentUser.id) || 
                              (currentUser.rol === 'colaborador' && (project.members || project.miembros || []).some(m => m.usuario_id == currentUser.id));
 
-    // CORREÇÃO CRÍTICA: Mapeamento defensivo aceitando 'phases' ou 'fases'
     const projectPhases = project.phases || project.fases || [];
-    
-    // CORREÇÃO CRÍTICA: Mapeamento defensivo aceitando 'members' ou 'miembros' ou 'equipo'
     const projectMembers = project.members || project.miembros || project.equipo || [];
 
-    // Render das Fases com checkboxes controlados e botões de reordenação
+    // Fases: nome + descrição + badge ordem, botões ABAIXO alinhados à esquerda
     const phasesHtml = projectPhases.length > 0
       ? projectPhases.map((phase, index) => {
           const isCompleted = phase.completada == 1 || phase.completada === true;
           
           return `
-            <div class="list-group-item d-flex justify-content-between align-items-center phase-item" data-phase-id="${phase.id}">
-              <div class="d-flex align-items-center">
+            <div class="list-group-item phase-item" data-phase-id="${phase.id}">
+              <div class="d-flex align-items-start">
                 <input 
                   type="checkbox" 
-                  class="form-check-input me-2 toggle-phase-checkbox" 
+                  class="form-check-input me-2 mt-1 toggle-phase-checkbox" 
                   data-project-id="${project.id}" 
                   data-phase-id="${phase.id}" 
                   ${isCompleted ? 'checked' : ''}
                 >
-                <span class="${isCompleted ? 'text-decoration-line-through text-muted' : ''}">
-                  ${phase.nombre}
-                </span>
+                <div class="flex-grow-1">
+                  <span class="${isCompleted ? 'text-decoration-line-through text-muted' : ''}">
+                    ${phase.nombre}
+                  </span>
+                  ${phase.descripcion ? `<br><small class="text-muted phase-description">${phase.descripcion}</small>` : ''}
+                </div>
               </div>
-              <div class="d-flex align-items-center gap-2">
+              <div class="mt-2 ms-6 d-flex flex-wrap align-items-center gap-2">
                 <span class="badge bg-light text-dark border">Ordem: ${phase.orden}</span>
                 ${canReorderPhases ? `
                   <button class="btn btn-sm btn-outline-secondary move-phase-up" data-phase-id="${phase.id}" data-project-id="${project.id}" ${index === 0 ? 'disabled' : ''} title="Mover para cima">
@@ -59,19 +59,18 @@ const ProjectDetail = {
         }).join("")
       : `<p class="text-muted p-2 m-0">Nenhuma fase cadastrada neste projeto.</p>`;
 
+    // Formulário de adicionar fase (linha horizontal)
     const phaseManagementHtml = canEdit ? `
-      <div class="mt-2 d-flex gap-2 align-items-center">
-        <input type="text" class="form-control form-control-sm new-phase-name-input" placeholder="Nova fase..." style="max-width:220px;" />
-        <input type="text" class="form-control form-control-sm new-phase-desc-input" placeholder="Descrição (opcional)" style="max-width:260px;" />
-        <button class="btn btn-sm btn-outline-primary add-phase-btn" data-project-id="${project.id}">
+      <div class="mt-3 d-flex flex-column gap-2" style="max-width: 400px;">
+        <input type="text" class="form-control form-control-sm new-phase-name-input" placeholder="Nova fase..." />
+        <textarea class="form-control form-control-sm new-phase-desc-input" rows="2" placeholder="Descrição (opcional)"></textarea>
+        <button class="btn btn-sm btn-outline-primary align-self-start add-phase-btn m-2" data-project-id="${project.id}">
           <i class="fas fa-plus"></i> Adicionar
         </button>
       </div>
     ` : '';
 
-    // Render dos Membros da Equipe
-    const canManageTeam = currentUser.rol === 'administrador' || currentUser.rol === 'jefe_proyecto';
-
+    // Membros: render SEM vírgulas
     const membersHtml = projectMembers.length > 0
       ? projectMembers.map(m => `
         <li class="list-group-item d-flex justify-content-between align-items-center">
@@ -83,8 +82,7 @@ const ProjectDetail = {
             <span class="badge bg-info">${m.rol_especifico || 'Membro'}</span>
             ${canManageTeam ? `<button class="btn btn-sm btn-outline-danger remove-member-btn" data-project-id="${project.id}" data-user-id="${m.usuario_id}" title="Remover membro"><i class="fas fa-times"></i></button>` : ''}
           </div>
-        </li>
-      `)
+        </li>`).join("")
       : `<p class="text-muted p-2 m-0">Nenhum membro alocado.</p>`;
 
     const allUsers = App.users || [];
@@ -116,14 +114,15 @@ const ProjectDetail = {
       <div class="row">
         <div class="col-md-6">
           <h6><strong>Descrição:</strong></h6>
-          <p class="text-secondary">${project.descripcion || 'Sem descrição.'}</p>
+          <p class="text-secondary project-desc-text" id="project-desc-text">${project.descripcion || 'Sem descrição.'}</p>
+          <button class="show-more-btn" id="show-more-btn" style="display:none;">Mostrar mais</button>
           <hr>
           <p><strong>Data de Início:</strong> ${Helpers.formatDate(project.fecha_inicio)}</p>
           <p><strong>Previsão de Entrega:</strong> ${Helpers.formatDate(project.fecha_entrega)}</p>
           <p><strong>Responsável:</strong> ${project.responsable_nombre || 'Não definido'}</p>
           
           ${canEdit ? `
-            <button class="btn btn-sm btn-warning mt-2" id="open-edit-project-modal-btn" data-id="${project.id}">
+            <button class="btn btn-sm btn-warning mt-2 mb-2" id="open-edit-project-modal-btn" data-id="${project.id}">
               <i class="fas fa-edit"></i> Editar Dados do Projeto
             </button>
           ` : ''}
@@ -153,5 +152,25 @@ const ProjectDetail = {
         </div>
       </div>
     `;
+  },
+  
+  initShowMore() {
+    const descEl = document.getElementById('project-desc-text');
+    const btn = document.getElementById('show-more-btn');
+    if (!descEl || !btn) return;
+    
+    if (descEl.scrollHeight > descEl.clientHeight) {
+      btn.style.display = 'inline-block';
+      btn.textContent = 'Mostrar mais';
+      btn.onclick = () => {
+        if (descEl.classList.contains('expanded')) {
+          descEl.classList.remove('expanded');
+          btn.textContent = 'Mostrar mais';
+        } else {
+          descEl.classList.add('expanded');
+          btn.textContent = 'Mostrar menos';
+        }
+      };
+    }
   }
 };

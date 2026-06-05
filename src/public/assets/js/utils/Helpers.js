@@ -16,36 +16,13 @@ const Helpers = {
     }
   },
 
-  calculateProgress(projects) {
-    // projects = array de projetos (já carregados)
-    return projects.reduce((acc, project) => {
-      const totalPhases = project.phases?.length || 0;
-      const completedPhases = project.phases?.filter(p => p.completada).length || 0;
-      acc[project.id] = totalPhases > 0 ? Math.round((completedPhases / totalPhases) * 100) : 0;
-      return acc;
-    }, {});
-  },
-
-  calculateProjectStatus(phases, currentEstado) {
-    if (!Array.isArray(phases)) return "planificacion";
-
-    const completed = phases.filter(p => p.completada).length;
-    const total = phases.length;
-
-    if (currentEstado === "pausado") return "pausado";
-    if (total === 0 || completed === 0) return "planificacion";
-    if (completed < total) return "en_curso";
-    if (completed === total) return "finalizado";
-
-    return "planificacion"; // fallback
-  },
-
-  // Helper para ordenação cronológica de projetos
-  sortProjectsByDate(projects, field = "fecha_inicio") {
-    return [...projects].sort((a, b) => {
-      const dateA = new Date(a[field] + "T00:00:00");
-      const dateB = new Date(b[field] + "T00:00:00");
-      return dateA - dateB;
-    });
+  renderResponsibleOptions(users, selectedId = null) {
+    const validManagers = users.filter(
+      (u) => u.rol === "jefe_proyecto" || u.rol === "administrador"
+    );
+    const options = validManagers
+      .map((u) => `<option value="${u.id}" ${u.id == selectedId ? 'selected' : ''}>${u.nombre} ${u.apellidos} (${u.rol === "administrador" ? "Admin" : "Jefe"})</option>`)
+      .join("");
+    return '<option value="">Selecione...</option>' + options;
   }
 };

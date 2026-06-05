@@ -11,7 +11,7 @@ spl_autoload_register(function (string $class): void {
     }
 
     $relativeClass = substr($class, strlen($prefix));
-    $file = $baseDir . str_replace('\\', '/', $relativeClass) . '.php';
+    $file = $baseDir . ucfirst(str_replace('\\', '/', $relativeClass)) . '.php';
 
     if (file_exists($file)) {
         require_once $file;

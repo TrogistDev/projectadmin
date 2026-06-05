@@ -13,10 +13,15 @@ class Request
     public function __construct()
     {
         $this->server = $_SERVER;
-        $this->query = $this->sanitize($_GET);
+
+        $rawQuery = $_GET;
+        if (empty($rawQuery) && !empty($_SERVER['QUERY_STRING'])) {
+            parse_str($_SERVER['QUERY_STRING'], $rawQuery);
+        }
+        $this->query = $this->sanitize($rawQuery);
+
         $this->body = $this->parseBody();
-        
-        // RIGOR: Limpeza de memória residual global do PHP
+
         $_POST = [];
         $_GET = [];
         $_REQUEST = [];

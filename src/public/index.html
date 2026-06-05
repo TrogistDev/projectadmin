@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="pt-BR">
+<html lang="es">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -34,11 +34,11 @@
       <div id="dashboard-screen" class="d-none">
 
         <!-- NAVBAR -->
-        <nav class="navbar navbar-expand-lg navbar-light bg-light rounded mb-4">
+        <nav class="navbar navbar-expand-lg navbar-dark bg-dark rounded mb-4 shadow-sm">
           <div class="container-fluid">
-            <span class="navbar-brand">Project Admin</span>
-            <button class="btn btn-outline-secondary" id="logout-button">Sair</button>
-            <button class="btn btn-outline-primary me-2 d-none" id="admin-users-button">Gerenciar Usuários</button>
+            <span class="navbar-brand fw-bold"><i class="fas fa-diagram-project me-2"></i>Panel de Gestión de Proyectos</span>
+            <button class="btn btn-outline-light btn-sm" id="logout-button">Cerrar sesión</button>
+            <button class="btn btn-outline-light btn-sm me-2 d-none" id="admin-users-button">Administrar Usuarios</button>
           </div>
         </nav>
 
@@ -54,51 +54,34 @@
           </div>
         </div>
 
-        <!-- TABELA DE PROJETOS -->
+        <!-- LISTAGEM DE PROJETOS -->
         <div class="card mb-4">
           <div class="card-header d-flex justify-content-between align-items-center">
-            <div>
-              <h5 class="mb-0 d-inline-block">Projetos</h5>
-              <div class="btn-group ms-3" role="group">
-                <input type="radio" class="btn-check" name="view-type" id="view-list" value="list" checked />
-                <label class="btn btn-outline-secondary btn-sm" for="view-list">Lista</label>
-                <input type="radio" class="btn-check" name="view-type" id="view-calendar" value="calendar" />
-                <label class="btn btn-outline-secondary btn-sm" for="view-calendar">Calendário</label>
-                <input type="radio" class="btn-check" name="view-type" id="view-timeline" value="timeline" />
-                <label class="btn btn-outline-secondary btn-sm" for="view-timeline">Timeline</label>
-              </div>
-            </div>
+            <h5 class="mb-0 me-3">Projetos</h5>
             <div class="d-flex gap-2">
-              <button class="btn btn-outline-secondary d-none d-sm-inline-block" id="open-filter-modal-btn" type="button">
-                <i class="fas fa-filter"></i> Filtros
+              <button class="btn btn-outline-secondary" id="open-filter-modal-btn" type="button">
+                <i class="fas fa-filter"></i> Filtros <span id="filter-badge" class="badge bg-danger d-none">0</span>
               </button>
               <div id="create-project-button-container"></div>
             </div>
           </div>
           <div class="card-body">
-            <div id="list-view">
-              <div class="table-responsive">
-                <table class="table table-hover" id="projects-table">
-                  <thead>
-                    <tr>
-                      <th>Nome</th>
-                      <th>Início</th>
-                      <th>Entrega</th>
-                      <th>Responsável</th>
-                      <th>Estado</th>
-                      <th>Progresso</th>
-                      <th>Ações</th>
-                    </tr>
-                  </thead>
-                  <tbody></tbody>
-                </table>
-              </div>
-            </div>
-            <div id="calendar-view" class="d-none">
-              <div id="calendar-container"></div>
-            </div>
-            <div id="timeline-view" class="d-none">
-              <div id="timeline-container"></div>
+            <div class="table-responsive">
+              <table class="table table-hover" id="projects-table">
+                <thead>
+                  <tr>
+                    <th>Nome</th>
+                    <th>Descrição</th>
+                    <th>Início</th>
+                    <th>Entrega</th>
+                    <th>Responsável</th>
+                    <th>Estado</th>
+                    <th>Progresso</th>
+                    <th>Ações</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
             </div>
           </div>
         </div>
@@ -159,6 +142,16 @@
                     <option value="deadline_asc">Prazo mais próximo primeiro (urgentes)</option>
                     <option value="deadline_desc">Prazo mais longe primeiro (menos urgentes)</option>
                   </select>
+                </div>
+
+                <div class="mb-3">
+                  <label for="filter-start-date" class="form-label">Data de início (desde)</label>
+                  <input type="date" id="filter-start-date" class="form-control" />
+                </div>
+
+                <div class="mb-3">
+                  <label for="filter-end-date" class="form-label">Data de entrega (até)</label>
+                  <input type="date" id="filter-end-date" class="form-control" />
                 </div>
               </div>
               <div class="modal-footer">

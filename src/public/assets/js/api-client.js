@@ -17,7 +17,7 @@ const ApiClient = {
       dataType: "json",
       xhrFields: { withCredentials: true },
     }).fail((xhr) => {
-      console.error(`API Error [${method} ${url}]`, xhr.status, xhr.responseText);
+      console.error(`API Error [${method} ${url}]`);
     });
   },
 
@@ -47,11 +47,26 @@ const ApiClient = {
     return this.request("POST", "/users", data);
   },
 
+  updateUser(id, data) {
+    return this.request("PUT", `/users/${id}`, data);
+  },
+
+  deleteUser(id) {
+    return this.request("DELETE", `/users/${id}`);
+  },
+
   // ==========================
   // PROJECT ENDPOINTS
   // ==========================
-  getProjects() {
-    return this.request("GET", "/projects");
+  getProjects(params = {}) {
+    const query = new URLSearchParams();
+    for (const [key, value] of Object.entries(params)) {
+      if (value !== undefined && value !== null && value !== '') {
+        query.set(key, value);
+      }
+    }
+    const qs = query.toString();
+    return this.request("GET", "/projects" + (qs ? "?" + qs : ""));
   },
 
   getProject(id) {
@@ -113,10 +128,5 @@ const ApiClient = {
 
   deletePhase(phaseId) {
     return this.request("DELETE", `/phases/${phaseId}`);
-  },
-  toggleProjectPause(projectId, isToPause) {
-    return this.request("PUT", `/projects/${projectId}/pause`, {
-        pausar: isToPause
-    });
-}
+  }
 };

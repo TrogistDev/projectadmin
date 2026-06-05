@@ -5,46 +5,288 @@ declare(strict_types=1);
 namespace Api\Services;
 
 use Api\Database\Database;
+use Api\Services\MemberService;
+use Api\Services\PhaseService;
 use PDO;
 use Throwable;
 use InvalidArgumentException;
 
 class ProjectService
 {
+    private MemberService $memberService;
+    private PhaseService $phaseService;
+
+    public function __construct()
+    {
+        $this->memberService = new MemberService();
+        $this->phaseService = new PhaseService();
+    }
+
     public function list(array $filter = [], array $user = []): array
     {
         $pdo = Database::getConnection();
 
+        $limit = isset($filter['limit']) && is_numeric($filter['limit']) ? (int)$filter['limit'] : 10;
+        $page = isset($filter['page']) && is_numeric($filter['page']) && (int)$filter['page'] > 0 ? (int)$filter['page'] : 1;
+        $offset = ($page - 1) * $limit;
+
+        $where = [];
+        $params = [];
+
+        $sql = 'SELECT p.*, u.nombre AS responsable_nombre, u.apellidos AS responsable_apellidos
+                FROM proyectos p
+                JOIN usuarios u ON u.id = p.responsable_id';
+
         if (($user['rol'] ?? '') === 'colaborador') {
-            $stmt = $pdo->prepare(
-                'SELECT p.*, u.nombre AS responsable_nombre, u.apellidos AS responsable_apellidos
-                 FROM proyectos p
-                 JOIN usuarios u ON u.id = p.responsable_id
-                 JOIN proyecto_miembro pm ON pm.proyecto_id = p.id
-                 WHERE pm.usuario_id = :user_id'
-            );
-            $stmt->execute(['user_id' => $user['id']]);
-        } else {
-            $stmt = $pdo->prepare(
-                'SELECT p.*, u.nombre AS responsable_nombre, u.apellidos AS responsable_apellidos
-                 FROM proyectos p
-                 JOIN usuarios u ON u.id = p.responsable_id'
-            );
-            $stmt->execute();
+            $sql .= ' JOIN proyecto_miembro pm ON pm.proyecto_id = p.id';
+            $where[] = 'pm.usuario_id = :user_id';
+            $params['user_id'] = $user['id'];
         }
 
-        $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
         if (!empty($filter['search'])) {
-            $search = mb_strtolower($filter['search']);
-            $projects = array_filter($projects, fn($project) => mb_stripos($project['nombre'], $search) !== false);
+            $where[] = 'LOWER(p.nombre) LIKE :search';
+            $params['search'] = '%' . mb_strtolower($filter['search']) . '%';
         }
 
         if (!empty($filter['estado'])) {
-            $projects = array_filter($projects, fn($project) => $project['estado'] === $filter['estado']);
+            $where[] = 'p.estado = :estado';
+            $params['estado'] = $filter['estado'];
         }
 
-        return array_values($projects);
+        if (!empty($filter['responsable_id'])) {
+            $where[] = 'p.responsable_id = :responsable_id';
+            $params['responsable_id'] = (int)$filter['responsable_id'];
+        }
+
+        if (!empty($filter['fecha_inicio'])) {
+            $where[] = 'p.fecha_inicio >= :fecha_inicio';
+            $params['fecha_inicio'] = $filter['fecha_inicio'];
+        }
+
+        if (!empty($filter['fecha_entrega'])) {
+            $where[] = 'p.fecha_entrega <= :fecha_entrega';
+            $params['fecha_entrega'] = $filter['fecha_entrega'];
+        }
+
+        // Filtro de intervalo de datas: projetos que começam OU terminam dentro do intervalo
+        if (!empty($filter['date_start']) || !empty($filter['date_end'])) {
+            $dateConditions = [];
+            $dsIndex = 1;
+            $deIndex = 1;
+
+            if (!empty($filter['date_start']) && !empty($filter['date_end'])) {
+                $dateConditions[] = "(p.fecha_inicio >= :ds1 AND p.fecha_inicio <= :de1)";
+                $dateConditions[] = "(p.fecha_entrega >= :ds2 AND p.fecha_entrega <= :de2)";
+                $params['ds1'] = $filter['date_start'];
+                $params['de1'] = $filter['date_end'];
+                $params['ds2'] = $filter['date_start'];
+                $params['de2'] = $filter['date_end'];
+            } elseif (!empty($filter['date_start'])) {
+                $dateConditions[] = "(p.fecha_inicio >= :ds OR p.fecha_entrega >= :ds)";
+                $params['ds'] = $filter['date_start'];
+            } elseif (!empty($filter['date_end'])) {
+                $dateConditions[] = "(p.fecha_inicio <= :de OR p.fecha_entrega <= :de)";
+                $params['de'] = $filter['date_end'];
+            }
+
+            if (!empty($dateConditions)) {
+                $where[] = '(' . implode(' OR ', $dateConditions) . ')';
+            }
+        }
+
+        if ($where) {
+            $sql .= ' WHERE ' . implode(' AND ', $where);
+        }
+
+        $sql .= ' ORDER BY p.fecha_creacion DESC LIMIT :limit OFFSET :offset';
+
+        $stmt = $pdo->prepare($sql);
+
+        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+
+        foreach ($params as $key => $value) {
+            $stmt->bindValue(':' . $key, $value);
+        }
+
+        $stmt->execute();
+
+        return [
+            'data' => $stmt->fetchAll(PDO::FETCH_ASSOC),
+            'page' => $page,
+            'limit' => $limit,
+            'total' => (int)$this->countTotal($filter, $user),
+            'totais_por_estado' => $this->countByStatus($filter, $user),
+        ];
+    }
+
+    private function countByStatus(array $filter = [], array $user = []): array
+    {
+        $pdo = Database::getConnection();
+
+        $where = [];
+        $params = [];
+
+        $sql = 'SELECT estado, COUNT(*) as qtd FROM proyectos p
+                JOIN usuarios u ON u.id = p.responsable_id';
+
+        if (($user['rol'] ?? '') === 'colaborador') {
+            $sql .= ' JOIN proyecto_miembro pm ON pm.proyecto_id = p.id';
+            $where[] = 'pm.usuario_id = :user_id';
+            $params['user_id'] = $user['id'];
+        }
+
+        if (!empty($filter['search'])) {
+            $where[] = 'LOWER(p.nombre) LIKE :search';
+            $params['search'] = '%' . mb_strtolower($filter['search']) . '%';
+        }
+
+        if (!empty($filter['estado'])) {
+            $where[] = 'p.estado = :estado';
+            $params['estado'] = $filter['estado'];
+        }
+
+        if (!empty($filter['responsable_id'])) {
+            $where[] = 'p.responsable_id = :responsable_id';
+            $params['responsable_id'] = (int)$filter['responsable_id'];
+        }
+
+        if (!empty($filter['fecha_inicio'])) {
+            $where[] = 'p.fecha_inicio >= :fecha_inicio';
+            $params['fecha_inicio'] = $filter['fecha_inicio'];
+        }
+
+        if (!empty($filter['fecha_entrega'])) {
+            $where[] = 'p.fecha_entrega <= :fecha_entrega';
+            $params['fecha_entrega'] = $filter['fecha_entrega'];
+        }
+
+        // Filtro de intervalo de datas
+        if (!empty($filter['date_start']) || !empty($filter['date_end'])) {
+            $dateConditions = [];
+
+            if (!empty($filter['date_start']) && !empty($filter['date_end'])) {
+                $dateConditions[] = "(p.fecha_inicio >= :ds1 AND p.fecha_inicio <= :de1)";
+                $dateConditions[] = "(p.fecha_entrega >= :ds2 AND p.fecha_entrega <= :de2)";
+                $params['ds1'] = $filter['date_start'];
+                $params['de1'] = $filter['date_end'];
+                $params['ds2'] = $filter['date_start'];
+                $params['de2'] = $filter['date_end'];
+            } elseif (!empty($filter['date_start'])) {
+                $dateConditions[] = "(p.fecha_inicio >= :ds OR p.fecha_entrega >= :ds)";
+                $params['ds'] = $filter['date_start'];
+            } elseif (!empty($filter['date_end'])) {
+                $dateConditions[] = "(p.fecha_inicio <= :de OR p.fecha_entrega <= :de)";
+                $params['de'] = $filter['date_end'];
+            }
+
+            if (!empty($dateConditions)) {
+                $where[] = '(' . implode(' OR ', $dateConditions) . ')';
+            }
+        }
+
+        if ($where) {
+            $sql .= ' WHERE ' . implode(' AND ', $where);
+        }
+
+        $sql .= ' GROUP BY estado';
+
+        $stmt = $pdo->prepare($sql);
+        foreach ($params as $key => $value) {
+            $stmt->bindValue(':' . $key, $value);
+        }
+        $stmt->execute();
+
+        $result = [
+            'planificacion' => 0,
+            'en_curso' => 0,
+            'pausado' => 0,
+            'finalizado' => 0,
+        ];
+
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $result[$row['estado']] = (int)$row['qtd'];
+        }
+
+        return $result;
+    }
+
+    private function countTotal(array $filter = [], array $user = []): int
+    {
+        $pdo = Database::getConnection();
+
+        $where = [];
+        $params = [];
+
+        $sql = 'SELECT COUNT(*) FROM proyectos p
+                JOIN usuarios u ON u.id = p.responsable_id';
+
+        if (($user['rol'] ?? '') === 'colaborador') {
+            $sql .= ' JOIN proyecto_miembro pm ON pm.proyecto_id = p.id';
+            $where[] = 'pm.usuario_id = :user_id';
+            $params['user_id'] = $user['id'];
+        }
+
+        if (!empty($filter['search'])) {
+            $where[] = 'LOWER(p.nombre) LIKE :search';
+            $params['search'] = '%' . mb_strtolower($filter['search']) . '%';
+        }
+
+        if (!empty($filter['estado'])) {
+            $where[] = 'p.estado = :estado';
+            $params['estado'] = $filter['estado'];
+        }
+
+        if (!empty($filter['responsable_id'])) {
+            $where[] = 'p.responsable_id = :responsable_id';
+            $params['responsable_id'] = (int)$filter['responsable_id'];
+        }
+
+        if (!empty($filter['fecha_inicio'])) {
+            $where[] = 'p.fecha_inicio >= :fecha_inicio';
+            $params['fecha_inicio'] = $filter['fecha_inicio'];
+        }
+
+        if (!empty($filter['fecha_entrega'])) {
+            $where[] = 'p.fecha_entrega <= :fecha_entrega';
+            $params['fecha_entrega'] = $filter['fecha_entrega'];
+        }
+
+        // Filtro de intervalo de datas
+        if (!empty($filter['date_start']) || !empty($filter['date_end'])) {
+            $dateConditions = [];
+
+            if (!empty($filter['date_start']) && !empty($filter['date_end'])) {
+                $dateConditions[] = "(p.fecha_inicio >= :ds1 AND p.fecha_inicio <= :de1)";
+                $dateConditions[] = "(p.fecha_entrega >= :ds2 AND p.fecha_entrega <= :de2)";
+                $params['ds1'] = $filter['date_start'];
+                $params['de1'] = $filter['date_end'];
+                $params['ds2'] = $filter['date_start'];
+                $params['de2'] = $filter['date_end'];
+            } elseif (!empty($filter['date_start'])) {
+                $dateConditions[] = "(p.fecha_inicio >= :ds OR p.fecha_entrega >= :ds)";
+                $params['ds'] = $filter['date_start'];
+            } elseif (!empty($filter['date_end'])) {
+                $dateConditions[] = "(p.fecha_inicio <= :de OR p.fecha_entrega <= :de)";
+                $params['de'] = $filter['date_end'];
+            }
+
+            if (!empty($dateConditions)) {
+                $where[] = '(' . implode(' OR ', $dateConditions) . ')';
+            }
+        }
+
+        if ($where) {
+            $sql .= ' WHERE ' . implode(' AND ', $where);
+        }
+
+        $stmt = $pdo->prepare($sql);
+        foreach ($params as $key => $value) {
+            $stmt->bindValue(':' . $key, $value);
+        }
+        $stmt->execute();
+
+        return (int)$stmt->fetchColumn();
     }
 
     public function find(int $id): array|false
@@ -52,21 +294,15 @@ class ProjectService
         $pdo = Database::getConnection();
         $stmt = $pdo->prepare('SELECT p.*, u.nombre AS responsable_nombre, u.apellidos AS responsable_apellidos FROM proyectos p JOIN usuarios u ON u.id = p.responsable_id WHERE p.id = :id');
         $stmt->execute(['id' => $id]);
-        
+
         $projectData = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if (!$projectData) {
             return false;
         }
 
-        $phases = $this->getPhases($id);
-        $members = $this->getMembers($id);
-
-        $projectData['phases'] = $phases;
-        $projectData['fases'] = $phases;
-
-        $projectData['members'] = $members;
-        $projectData['miembros'] = $members;
+        $projectData['phases'] = $this->phaseService->listByProject($id);
+        $projectData['members'] = $this->memberService->listByProject($id);
 
         return $projectData;
     }
@@ -115,7 +351,7 @@ class ProjectService
                     'INSERT INTO fases (nombre, descripcion, orden, completada, proyecto_id)
                      VALUES (:nombre, :descripcion, :orden, 0, :proyecto_id)'
                 );
-                
+
                 foreach ($rawPhases as $index => $phase) {
                     $nombre = is_array($phase) ? ($phase['nombre'] ?? '') : $phase;
                     $descripcion = is_array($phase) ? ($phase['descripcion'] ?? 'Fase inicial configurada na criação.') : 'Fase inicial configurada na criação.';
@@ -144,10 +380,10 @@ class ProjectService
                     'INSERT INTO proyecto_miembro (proyecto_id, usuario_id, fecha_add, rol_especifico)
                      VALUES (:proyecto_id, :usuario_id, :fecha_add, :rol_especifico)'
                 );
-                
+
                 foreach ($rawMembers as $member) {
                     $userId = isset($member['usuario_id']) ? (int)$member['usuario_id'] : (isset($member['id']) ? (int)$member['id'] : null);
-                    
+
                     // Evita duplicar o próprio responsável que foi inserido acima
                     if (!$userId || $userId === (int)$data['responsable_id']) {
                         continue;
@@ -208,22 +444,6 @@ class ProjectService
         $stmt->execute($params);
     }
 
-    /**
-     * Altera especificamente o estado do projeto de forma atômica (ex: pausado)
-     */
-    public function updateEstado(int $id, string $estado): void
-    {
-        $pdo = Database::getConnection();
-        $stmt = $pdo->prepare('UPDATE proyectos SET estado = :estado WHERE id = :id');
-        $stmt->execute([
-            'estado' => $estado,
-            'id' => $id
-        ]);
-    }
-
-    /**
-     * Deleção rígida com limpeza prévia de relacionamentos dependentes (Cascata controlada)
-     */
     public function delete(int $id): void
     {
         $pdo = Database::getConnection();
@@ -252,20 +472,20 @@ class ProjectService
     public function recalculateStatus(int $projectId): void
     {
         $pdo = Database::getConnection();
-        $stmt = $pdo->prepare('SELECT COUNT(*) AS total, SUM(completada) AS completed FROM fases WHERE proyecto_id = :id');
+        $stmt = $pdo->prepare(
+            'SELECT p.estado, COUNT(f.id) AS total, SUM(f.completada) AS completed
+             FROM proyectos p
+             LEFT JOIN fases f ON f.proyecto_id = p.id
+             WHERE p.id = :id
+             GROUP BY p.estado'
+        );
         $stmt->execute(['id' => $projectId]);
-        $result = $stmt->fetch();
+        $row = $stmt->fetch();
 
-        $stmt = $pdo->prepare('SELECT estado FROM proyectos WHERE id = :id');
-        $stmt->execute(['id' => $projectId]);
-        $project = $stmt->fetch();
+        $total = (int)$row['total'];
+        $completed = (int)$row['completed'];
+        $currentStatus = $row['estado'] ?? 'planificacion';
 
-        $total = (int)$result['total'];
-        $completed = (int)$result['completed'];
-        $currentStatus = $project['estado'] ?? 'planificacion';
-        $percentage = $total > 0 ? (int)floor($completed * 100 / $total) : 0;
-
-        // Se o projeto estiver pausado explicitamente, ele não deve mudar sozinho ao atualizar tarefas
         if ($currentStatus === 'pausado') {
             $status = 'pausado';
         } elseif ($completed === $total && $total > 0) {
@@ -276,12 +496,9 @@ class ProjectService
             $status = 'en_curso';
         }
 
+        $percentage = $total > 0 ? (int)floor($completed * 100 / $total) : 0;
         $stmt = $pdo->prepare('UPDATE proyectos SET porcentaje_avance = :percentage, estado = :status WHERE id = :id');
-        $stmt->execute([
-            'percentage' => $percentage,
-            'status' => $status,
-            'id' => $projectId,
-        ]);
+        $stmt->execute(['percentage' => $percentage, 'status' => $status, 'id' => $projectId]);
     }
 
     public function isMember(int $projectId, int $userId): bool
@@ -325,26 +542,5 @@ class ProjectService
         if (!$user || ($user['rol'] !== 'jefe_proyecto' && $user['rol'] !== 'administrador')) {
             throw new InvalidArgumentException('El responsable debe ser un jefe de proyecto o administrador.');
         }
-    }
-
-    private function getPhases(int $projectId): array
-    {
-        $pdo = Database::getConnection();
-        $stmt = $pdo->prepare('SELECT * FROM fases WHERE proyecto_id = :id ORDER BY orden ASC');
-        $stmt->execute(['id' => $projectId]);
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
-    }
-
-    private function getMembers(int $projectId): array
-    {
-        $pdo = Database::getConnection();
-        $stmt = $pdo->prepare(
-            'SELECT pm.usuario_id, u.nombre, u.apellidos, u.correo, pm.rol_especifico, pm.fecha_add
-             FROM proyecto_miembro pm
-             JOIN usuarios u ON u.id = pm.usuario_id
-             WHERE pm.proyecto_id = :id'
-        );
-        $stmt->execute(['id' => $projectId]);
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 }

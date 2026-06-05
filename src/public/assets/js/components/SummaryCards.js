@@ -1,10 +1,12 @@
 // components/SummaryCards.js
 const SummaryCards = {
-  render(projects, helpers = Helpers) {
-    const count = projects.reduce((acc, project) => {
-      acc[project.estado] = (acc[project.estado] || 0) + 1;
-      return acc;
-    }, {});
+  render(responseData) {
+    const counts = responseData?.totais_por_estado || {
+      planificacion: 0,
+      en_curso: 0,
+      pausado: 0,
+      finalizado: 0,
+    };
 
     const labels = [
       { key: "planificacion", title: "Planejamento", color: "secondary" },
@@ -18,7 +20,7 @@ const SummaryCards = {
         <div class="card text-white bg-${item.color} h-100">
           <div class="card-body">
             <h6>${item.title}</h6>
-            <h3>${count[item.key] || 0}</h3>
+            <h3>${counts[item.key] || 0}</h3>
           </div>
         </div>
       </div>

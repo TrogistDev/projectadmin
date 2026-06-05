@@ -1,12 +1,10 @@
-
 const App = {
   user: null,
   projects: [],
   users: [],
   currentProjectId: null,
-  currentView: "list",
 
-init() {
+  init() {
     ModalCreateProject.init();
     ModalEditProject.init();
     ModalCreateUser.init();
@@ -14,48 +12,56 @@ init() {
 
     const savedUser = sessionStorage.getItem('user');
     if (savedUser) {
-        try {
-            this.user = JSON.parse(savedUser);
-            Auth.showDashboard();
-            Projects.loadProjects();
-            Users.loadUsers();
-            return;
-        } catch (e) {
-            console.warn('Sessão inválida, limpando...', e);
-            sessionStorage.removeItem('user');
-        }
+      try {
+        this.user = JSON.parse(savedUser);
+        Auth.showDashboard();
+        Projects.updatePageSize();
+        Projects.loadProjects();
+        Users.loadUsers();
+        return;
+      } catch (e) {
+        sessionStorage.removeItem('user');
+      }
     }
     Auth.showLogin();
-},
+  },
 
   bindEvents() {
+    $(window).on("resize", () => {
+      Projects.updatePageSize();
+    });
     $("#login-form").on("submit", (e) => { e.preventDefault(); Auth.handleLogin(); });
     $("#logout-button").on("click", () => Auth.handleLogout());
-    $("#refresh-projects").on("click", () => Projects.loadProjects());
 
-    $("input[name='view-type']").on("change", (event) => {
-      this.currentView = $(event.target).val();
-      this.switchView();
-    });
-
-    $(".card-header").on("click", "#create-project-button", () => Projects.showCreateProjectModal());
     $("#create-project-form").on("submit", (e) => { e.preventDefault(); Projects.handleCreateProject(); });
-    $("#create-project-modal").on("click", "#add-phase-field-btn", (e) => { e.preventDefault(); Projects.appendPhaseField(); });
+    $(document).on("click", "#add-phase-field-btn", (e) => { e.preventDefault(); Projects.appendPhaseField(); });
     $("#project-phases-inputs-container").on("click", ".remove-phase-field-btn", (e) => { e.preventDefault(); $(e.target).closest(".dynamic-phase-input").remove(); });
     
-    $(document).off("submit", "#create-phase-form").on("submit", "#create-phase-form", (e) => { 
+    $(document).on("submit", "#create-phase-form", (e) => { 
       e.preventDefault(); 
       Projects.handleCreatePhase(); 
     });
 
     $("#admin-users-button").on("click", () => {
       bootstrap.Modal.getOrCreateInstance(document.getElementById("create-user-modal")).show();
+      Users.loadUsers();
+      Users.renderUsersList();
+      Users.bindUsersEvents();
     });
     $("#create-user-form").on("submit", (e) => { e.preventDefault(); Users.handleCreateUser(); });
 
-    $("#dashboard-screen").off("click", ".view-project-btn").on("click", ".view-project-btn", (event) => {
+    $("#dashboard-screen").on("click", ".view-project-btn", (event) => {
       const id = $(event.target).data("id");
-      if (id) Projects.openProject(id);
+      if (id) {
+        Projects.openProject(id);
+        $('html, body').animate({
+          scrollTop: $("#project-detail").offset().top - 20
+        }, 500);
+      }
+    });
+
+    $("#dashboard-screen").on("click", "#create-project-button", () => {
+      Projects.showCreateProjectModal();
     });
 
     $("#close-detail").on("click", () => this.closeDetail());
@@ -78,7 +84,7 @@ init() {
     $("#dashboard-screen").on("click", ".pause-project-btn", (event) => {
       event.stopPropagation();
       const id = $(event.target).data("id");
-      const isCurrentlyPaused = $(event.target).data("paused") === true;
+      const isCurrentlyPaused = $(event.target).data("paused");
       Projects.handleTogglePauseProject(id, isCurrentlyPaused);
     });
 
@@ -89,6 +95,9 @@ init() {
     });
 
     $("#open-filter-modal-btn").on("click", () => {
+      if (typeof Projects.populateResponsibleFilter === 'function') {
+        Projects.populateResponsibleFilter();
+      }
       const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById("filter-modal"));
       modal.show();
     });
@@ -99,28 +108,17 @@ init() {
     });
   },
 
-  showLogin() { Auth.showLogin(); },
-  showDashboard() { Auth.showDashboard(); },
-
   closeDetail() {
     this.currentProjectId = null;
     $("#project-detail").addClass("d-none");
   },
 
   renderHeaderActions() {
+    const role = App.user ? App.user.rol : "colaborador";
     const $buttonContainer = $("#create-project-button-container");
-    $buttonContainer.empty();
-    const secObj = window.Security || Security;
-    if (secObj && typeof secObj.canCreateProject === "function") {
-      if (secObj.canCreateProject()) {
-        $buttonContainer.html('<button class="btn btn-primary" id="create-project-button">Novo projeto</button>');
-      }
+    if (role === "administrador" || role === "jefe_proyecto") {
+      $buttonContainer.html('<button class="btn btn-primary" id="create-project-button">Novo projeto</button>');
     }
-  },
-
-  switchView() {
-    $("#list-view, #calendar-view, #timeline-view").addClass("d-none");
-    $(`#${this.currentView}-view`).removeClass("d-none");
   },
 
   showFeedback(message, type = "info", target = "#login-feedback") {

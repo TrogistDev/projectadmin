@@ -45,4 +45,32 @@ class UserController
         $newUser = $this->service->create($data);
         Response::json($newUser, 201);
     }
+
+    public function update(int $id, Request $request): void
+    {
+        Auth::requireLogin();
+        $currentUser = Auth::user();
+        $userRole = $currentUser['rol'] ?? $currentUser['role'] ?? '';
+
+        if (!Permission::canManageUsers($userRole)) {
+            Response::error('Não autorizado para gerenciar usuários.', 403);
+        }
+
+        $this->service->update($id, $request->getBody());
+        Response::json(['message' => 'Usuário atualizado com sucesso.']);
+    }
+
+    public function delete(int $id): void
+    {
+        Auth::requireLogin();
+        $currentUser = Auth::user();
+        $userRole = $currentUser['rol'] ?? $currentUser['role'] ?? '';
+
+        if (!Permission::canManageUsers($userRole)) {
+            Response::error('Não autorizado para gerenciar usuários.', 403);
+        }
+
+        $this->service->delete($id);
+        Response::json(['message' => 'Usuário excluído com sucesso.']);
+    }
 }

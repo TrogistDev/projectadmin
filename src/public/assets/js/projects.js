@@ -1,21 +1,97 @@
 const Projects = {
   isSubmitting: false,
+  currentPage: 1,
+  pageSize: 10,
+  hasMore: false,
+  totalLoaded: 0,
+  _lastProjectResponse: null,
 
-  loadProjects() {
-    ApiClient.getProjects()
-      .done((projects) => {
-        App.projects = projects.map((p) => ({
+  loadProjects(reset = true) {
+    this.updatePageSize();
+    if (reset) {
+      this.currentPage = 1;
+      App.projects = [];
+      this.totalLoaded = 0;
+    }
+
+    const search = ($("#filter-search").val() || "").trim();
+    const estadoFilter = $("#filter-state").val();
+    const responsibleFilter = $("#filter-responsible").val();
+    const isSearching = !!search;
+
+    const params = {
+      page: this.currentPage,
+      limit: isSearching ? 1000 : this.pageSize,
+    };
+
+    if (search) params.search = search;
+    if (estadoFilter) params.estado = estadoFilter;
+    if (responsibleFilter) params.responsable_id = responsibleFilter;
+
+    const dateOrder = $("#filter-date-order").val();
+    if (dateOrder) params.date_order = dateOrder;
+
+    const deadlineOrder = $("#filter-deadline-order").val();
+    if (deadlineOrder) params.deadline_order = deadlineOrder;
+
+    const startDate = $("#filter-start-date").val();
+    const endDate = $("#filter-end-date").val();
+    if (startDate || endDate) {
+      params.date_start = startDate;
+      params.date_end = endDate;
+    }
+
+    ApiClient.getProjects(params)
+      .done((response) => {
+        this._lastProjectResponse = response;
+        const pageData = response.data || [];
+        const pageNumber = response.page || this.currentPage;
+        const total = response.total || pageData.length;
+
+        const parsed = pageData.map((p) => ({
           ...p,
           porcentaje_avance: p.porcentaje_avance !== undefined ? parseInt(p.porcentaje_avance) : 0,
         }));
+
+        if (reset) {
+          App.projects = parsed;
+        } else {
+          App.projects = [...App.projects, ...parsed];
+        }
+
+        this.totalLoaded = App.projects.length;
+        this.hasMore = App.projects.length < total;
+        this.currentPage = pageNumber + 1;
+
         this.renderProjects();
         this.renderSummary();
+        this.renderLoadMoreButton();
         this.populateResponsibleFilter();
       })
       .fail((xhr) => {
         const msg = xhr.responseJSON?.error || "Erro ao carregar projetos.";
         App.showFeedback(msg, "danger", "#dashboard-feedback");
       });
+  },
+
+  updatePageSize() {
+    this.pageSize = window.innerWidth < 768 ? 5 : 10;
+  },
+
+  renderLoadMoreButton() {
+    const $btn = $("#load-more-projects-btn");
+    if (!this.hasMore) {
+      if ($btn.length) $btn.remove();
+      return;
+    }
+    if (!$btn.length) {
+      $("<button>")
+        .attr("id", "load-more-projects-btn")
+        .addClass("btn btn-outline-primary mt-3")
+        .text("Mostrar mais projetos")
+        .on("click", () => this.loadProjects(false))
+        .insertAfter("#projects-table");
+    }
   },
 
   populateResponsibleFilter() {
@@ -62,15 +138,49 @@ const Projects = {
     const userRole = App.user ? App.user.rol : "colaborador";
     const rowsHtml = filtered.map((project) => ProjectRow.render(project, userRole)).join("");
     $("#projects-table tbody").html(rowsHtml);
+
+    this.updateFilterBadge();
   },
 
   applyFilters() {
-    this.applyFiltersSilent();
-    this.loadProjects();
+    this.loadProjects(true);
+    this.updateFilterBadge();
+  },
+
+  updateFilterBadge() {
+    const search = ($("#filter-search").val() || "").trim();
+    const estadoFilter = $("#filter-state").val();
+    const responsibleFilter = $("#filter-responsible").val();
+    const dateOrder = $("#filter-date-order").val();
+    const deadlineOrder = $("#filter-deadline-order").val();
+    const dateStart = $("#filter-start-date").val();
+    const dateEnd = $("#filter-end-date").val();
+
+    let count = 0;
+    if (search) count++;
+    if (estadoFilter) count++;
+    if (responsibleFilter) count++;
+    if (dateOrder) count++;
+    if (deadlineOrder) count++;
+    if (dateStart || dateEnd) count++;
+
+    const $badge = $("#filter-badge");
+    if (count > 0) {
+      $badge.text(count).removeClass("d-none");
+    } else {
+      $badge.addClass("d-none");
+    }
   },
 
   renderSummary() {
-    const html = SummaryCards.render(App.projects);
+    const data = this._lastProjectResponse || {};
+    const counts = data.totais_por_estado || {
+      planificacion: 0,
+      en_curso: 0,
+      pausado: 0,
+      finalizado: 0,
+    };
+    const html = SummaryCards.render({ totais_por_estado: counts });
     $("#summary-cards").html(html);
   },
 
@@ -78,12 +188,16 @@ const Projects = {
     ApiClient.getProject(id)
       .done((project) => {
         const html = ProjectDetail.render(project);
+        $("#detail-title").text(project.nombre || 'Detalhe do projeto');
         $("#detail-body").html(html);
         $("#project-detail").removeClass("d-none");
         App.currentProjectId = id;
         this.bindPhaseReorderEvents();
         this.bindMemberManagementEvents();
         this.bindPhaseDetailEvents();
+        if (typeof ProjectDetail.initShowMore === 'function') {
+          ProjectDetail.initShowMore();
+        }
       })
       .fail((xhr) => {
         const msg = xhr.responseJSON?.error || "Erro ao abrir projeto.";
@@ -123,10 +237,16 @@ const Projects = {
     });
 
     const initialPhases = [];
-    $("#project-phases-inputs-container .dynamic-phase-input input").each(function (index) {
-      const phaseName = $(this).val().trim();
+    $("#project-phases-inputs-container .dynamic-phase-input").each(function (index) {
+      const $nameInput = $(this).find(".phase-name-input, input[type='text']").first();
+      const $descInput = $(this).find(".phase-desc-input");
+      const phaseName = $nameInput.val().trim();
       if (phaseName) {
-        initialPhases.push({ nombre: phaseName, orden: index + 1 });
+        initialPhases.push({ 
+          nombre: phaseName, 
+          descripcion: $descInput.length ? $descInput.val().trim() : '',
+          orden: index + 1 
+        });
       }
     });
 
@@ -149,7 +269,9 @@ const Projects = {
           $form[0].reset();
           $("#project-phases-inputs-container").html(`
             <div class="input-group mb-2 dynamic-phase-input">
-              <input type="text" class="form-control form-control-sm" placeholder="Ex: Planejamento" required />
+              <input type="text" class="form-control form-control-sm phase-name-input" placeholder="Ex: Planejamento" required />
+              <textarea class="form-control form-control-sm phase-desc-input" rows="2" placeholder="Descrição da fase (opcional)"></textarea>
+              <button class="btn btn-outline-danger btn-sm remove-phase-field-btn" type="button">×</button>
             </div>
           `);
           $("#create-project-feedback").empty();
@@ -489,7 +611,8 @@ const Projects = {
     }
     $container.append(`
       <div class="input-group mb-2 dynamic-phase-input">
-        <input type="text" class="form-control form-control-sm" placeholder="Ex: Nova Fase" required />
+        <input type="text" class="form-control form-control-sm phase-name-input" placeholder="Ex: Nova Fase" required />
+        <textarea class="form-control form-control-sm phase-desc-input" rows="2" placeholder="Descrição (opcional)"></textarea>
         <button class="btn btn-outline-danger btn-sm remove-phase-field-btn" type="button">×</button>
       </div>
     `);

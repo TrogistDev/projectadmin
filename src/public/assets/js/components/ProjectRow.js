@@ -4,9 +4,7 @@ const ProjectRow = {
     const entrega = helpers.formatDate(project.fecha_entrega);
     const progresso = project.porcentaje_avance || 0;
 
-    // Mapeamento rígido de classes CSS com base no estado real vindo do banco
-    let progressColorClass = "bg-primary"; // padrão azul para en_curso
-    
+    let progressColorClass = "bg-primary";
     switch (project.estado) {
       case "planificacion":
         progressColorClass = "bg-secondary";
@@ -19,7 +17,6 @@ const ProjectRow = {
         break;
     }
 
-    // Regras rígidas de renderização de controle por nível de permissão (Administrador / Jefe de Proyecto)
     let actionButtonsHtml = "";
     if (currentUserRole === "administrador" || currentUserRole === "jefe_proyecto") {
       const isPaused = project.estado === "pausado";
@@ -38,26 +35,20 @@ const ProjectRow = {
 
     return `
       <tr data-project-id="${project.id}">
-        <td><strong>${project.nombre}</strong></td>
-        <td>${inicio}</td>
-        <td>${entrega}</td>
-        <td>${project.responsable_nombre || "Não atribuído"}</td>
-        <td><span class="badge ${project.estado === 'finalizado' ? 'bg-success' : 'bg-light text-dark border'}">${helpers.statusLabel(project.estado)}</span></td>
-        <td>
-          <div class="progress" style="height: 18px;">
-            <div 
-              class="progress-bar ${progressColorClass}" 
-              role="progressbar" 
-              style="width: ${progresso}%;" 
-              aria-valuenow="${progresso}" 
-              aria-valuemin="0" 
-              aria-valuemax="100"
-            >
+        <td data-label="Projeto"><strong>${project.nombre}</strong></td>
+        <td data-label="Descrição">${project.descripcion || ''}</td>
+        <td data-label="Início">${inicio}</td>
+        <td data-label="Entrega">${entrega}</td>
+        <td data-label="Responsável">${project.responsable_nombre || "Não atribuído"}</td>
+        <td data-label="Estado"><span class="badge ${project.estado === 'finalizado' ? 'bg-success' : 'bg-light text-dark border'}">${helpers.statusLabel(project.estado)}</span></td>
+        <td data-label="Progresso">
+          <div class="progress project-row-progress progress-full-mobile" style="height: 18px; background-color: #dee2e6;">
+            <div class="progress-bar ${progressColorClass}" role="progressbar" style="width: ${progresso}%;" aria-valuenow="${progresso}" aria-valuemin="0" aria-valuemax="100">
               ${progresso}%
             </div>
           </div>
         </td>
-        <td>
+        <td data-label="Ações">
           <div class="btn-group gap-1">
             <button class="btn btn-sm btn-outline-primary view-project-btn" data-id="${project.id}">Ver</button>
             ${actionButtonsHtml}

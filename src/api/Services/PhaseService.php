@@ -106,8 +106,28 @@ class PhaseService
     public function delete(int $id): void
     {
         $pdo = Database::getConnection();
-        $stmt = $pdo->prepare('DELETE FROM fases WHERE id = :id');
-        $stmt->execute(['id' => $id]);
+        $pdo->beginTransaction();
+
+        try {
+            $projectId = $this->getProjectId($id);
+
+            $stmtDelete = $pdo->prepare('DELETE FROM fases WHERE id = :id');
+            $stmtDelete->execute(['id' => $id]);
+
+            if ($projectId !== null) {
+                $stmtOrder = $pdo->prepare('SELECT orden FROM fases WHERE id = :id LIMIT 1');
+                $stmtOrder->execute(['id' => $id]);
+                $deletedOrder = (int)$stmtOrder->fetchColumn();
+
+                $stmtRenumber = $pdo->prepare('UPDATE fases SET orden = orden - 1 WHERE proyecto_id = :projectId AND orden > :deletedOrder');
+                $stmtRenumber->execute(['projectId' => $projectId, 'deletedOrder' => $deletedOrder]);
+            }
+
+            $pdo->commit();
+        } catch (Throwable $e) {
+            $pdo->rollBack();
+            throw $e;
+        }
     }
 
     /**
