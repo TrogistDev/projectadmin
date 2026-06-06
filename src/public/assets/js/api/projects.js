@@ -171,9 +171,13 @@ const Projects = {
         if (typeof ProjectDetail.initShowMore === 'function') {
           ProjectDetail.initShowMore();
         }
-        setTimeout(() => {
-          $('html, body').animate({ scrollTop: $("#project-detail").offset().top - 20 }, 400);
-        }, 100);
+
+        
+          setTimeout(() => {
+            $('html, body').animate({ scrollTop: $("#project-detail").offset().top - 20 }, 400);
+          }, 100);
+          
+        
       })
       .fail((xhr) => {
         App.showFeedback(xhr.responseJSON?.error || "Erro ao abrir projeto.", "danger", "#dashboard-feedback");

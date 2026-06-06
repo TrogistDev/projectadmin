@@ -79,11 +79,6 @@ const App = {
       Projects.handleTogglePauseProject(id, isCurrentlyPaused);
     });
 
-    $("#dashboard-screen").on("click", ".delete-project-btn", (event) => {
-      event.stopPropagation();
-      const id = $(event.target).data("id");
-      Projects.handleDeleteProject(id);
-    });
 
     $("#open-filter-modal-btn").on("click", () => {
       if (typeof Projects.populateResponsibleFilter === 'function') {

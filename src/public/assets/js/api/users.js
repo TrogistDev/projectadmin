@@ -112,7 +112,9 @@ const Users = {
           <div class="card-body p-3">
             <div class="d-flex justify-content-between align-items-start mb-2">
               <h6 class="card-title mb-0">${u.nombre} ${u.apellidos}</h6>
-              <button class="btn btn-sm btn-outline-danger delete-user-btn" data-user-id="${u.id}">
+              <button class="btn btn-sm btn-outline-danger p-1 d-flex align-items-center justify-content-center delete-user-btn" data-user-id="${u.id}" title="Eliminar usuario">
+                <span aria-hidden="true" style="font-size: 0.85rem; line-height: 1;">&#x1F5D1;&#xFE0F;</span>
+              </button>
                 <i class="fas fa-trash"></i>
               </button>
             </div>

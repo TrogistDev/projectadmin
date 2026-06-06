@@ -1,2 +1,32 @@
+# ----------------------------------------------------------------------
+# 1. ATIVAR COMPRESSÃO DE TEXTO (DEFLATE/GZIP)
+# Remove o peso extra dos arquivos trafegados na rede (CSS, JS, JSON)
+# ----------------------------------------------------------------------
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/plain text/xml text/css text/javascript application/javascript application/json
+</IfModule>
+
+# ----------------------------------------------------------------------
+# 2. DEFINIR CACHE ESTRITO DO NAVEGADOR (EXPIRES HEADERS)
+# Força o navegador a salvar o Bootstrap, jQuery e CSS local por 1 ano
+# ----------------------------------------------------------------------
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresDefault "access plus 1 month"
+
+    # Estáticos de Infraestrutura (Evita re-download no F5)
+    ExpiresByType text/css "access plus 1 year"
+    ExpiresByType application/javascript "access plus 1 year"
+    ExpiresByType text/javascript "access plus 1 year"
+    
+    # Imagens e ícones
+    ExpiresByType image/x-icon "access plus 1 year"
+    ExpiresByType image/png "access plus 1 year"
+</IfModule>
+
+# ----------------------------------------------------------------------
+# 3. REGRAS DE ROTEAMENTO (SEU BACKEND PHP)
+# Mantém a estrutura de API e MVC funcionando perfeitamente
+# ----------------------------------------------------------------------
 RewriteEngine On
 RewriteRule ^api/(.*)$ ../api/index.php [QSA,L]
