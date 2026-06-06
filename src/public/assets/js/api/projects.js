@@ -1,3 +1,5 @@
+// src/public/assets/js/api/projects.js
+
 const Projects = {
   isSubmitting: false,
   currentPage: 1,
@@ -5,6 +7,10 @@ const Projects = {
   hasMore: false,
   totalLoaded: 0,
   _lastProjectResponse: null,
+
+  init() {
+    this.bindGlobalEvents();
+  },
 
   loadProjects(reset = true) {
     this.updatePageSize();
@@ -52,11 +58,7 @@ const Projects = {
           porcentaje_avance: p.porcentaje_avance !== undefined ? parseInt(p.porcentaje_avance) : 0,
         }));
 
-        if (reset) {
-          App.projects = parsed;
-        } else {
-          App.projects = [...App.projects, ...parsed];
-        }
+        App.projects = reset ? parsed : [...App.projects, ...parsed];
 
         this.totalLoaded = App.projects.length;
         this.hasMore = App.projects.length < total;
@@ -114,7 +116,6 @@ const Projects = {
     const estadoFilter = $("#filter-state").val();
     const responsibleFilter = $("#filter-responsible").val();
     const dateOrder = $("#filter-date-order").val();
-    const deadlineOrder = $("#filter-deadline-order").val();
 
     let filtered = App.projects.filter(
       (p) => p.nombre.toLowerCase().includes(search) &&
@@ -123,15 +124,9 @@ const Projects = {
     );
 
     if (dateOrder === "start_asc") {
-      filtered = [...filtered].sort((a, b) => (a.fecha_inicio || "").localeCompare(b.fecha_inicio || ""));
+      filtered.sort((a, b) => (a.fecha_inicio || "").localeCompare(b.fecha_inicio || ""));
     } else if (dateOrder === "start_desc") {
-      filtered = [...filtered].sort((a, b) => (b.fecha_inicio || "").localeCompare(a.fecha_inicio || ""));
-    }
-
-    if (deadlineOrder === "deadline_asc") {
-      filtered = [...filtered].sort((a, b) => (a.fecha_entrega || "").localeCompare(b.fecha_entrega || ""));
-    } else if (deadlineOrder === "deadline_desc") {
-      filtered = [...filtered].sort((a, b) => (b.fecha_entrega || "").localeCompare(a.fecha_entrega || ""));
+      filtered.sort((a, b) => (b.fecha_inicio || "").localeCompare(a.fecha_inicio || ""));
     }
 
     const userRole = App.user ? App.user.rol : "colaborador";
@@ -147,60 +142,41 @@ const Projects = {
   },
 
   updateFilterBadge() {
-    const search = ($("#filter-search").val() || "").trim();
-    const estadoFilter = $("#filter-state").val();
-    const responsibleFilter = $("#filter-responsible").val();
-    const dateOrder = $("#filter-date-order").val();
-    const deadlineOrder = $("#filter-deadline-order").val();
-    const dateStart = $("#filter-start-date").val();
-    const dateEnd = $("#filter-end-date").val();
-
-    let count = 0;
-    if (search) count++;
-    if (estadoFilter) count++;
-    if (responsibleFilter) count++;
-    if (dateOrder) count++;
-    if (deadlineOrder) count++;
-    if (dateStart || dateEnd) count++;
-
+    const conditions = [
+      $("#filter-search").val()?.trim(),
+      $("#filter-state").val(),
+      $("#filter-responsible").val(),
+      $("#filter-date-order").val(),
+      $("#filter-deadline-order").val(),
+      $("#filter-start-date").val() || $("#filter-end-date").val()
+    ];
+    
+    const count = conditions.filter(Boolean).length;
     const $badge = $("#filter-badge");
-    if (count > 0) {
-      $badge.text(count).removeClass("d-none");
-    } else {
-      $badge.addClass("d-none");
-    }
+    count > 0 ? $badge.text(count).removeClass("d-none") : $badge.addClass("d-none");
   },
 
   renderSummary() {
-    const data = this._lastProjectResponse || {};
-    const counts = data.totais_por_estado || {
-      planificacion: 0,
-      en_curso: 0,
-      pausado: 0,
-      finalizado: 0,
-    };
-    const html = SummaryCards.render({ totais_por_estado: counts });
-    $("#summary-cards").html(html);
+    $("#summary-cards").html(SummaryCards.render(this._lastProjectResponse));
   },
 
   openProject(id) {
     ApiClient.getProject(id)
       .done((project) => {
-        const html = ProjectDetail.render(project);
         $("#detail-title").text(project.nombre || 'Detalhe do projeto');
-        $("#detail-body").html(html);
+        $("#detail-body").html(ProjectDetail.render(project));
         $("#project-detail").removeClass("d-none");
         App.currentProjectId = id;
-        this.bindPhaseReorderEvents();
-        this.bindMemberManagementEvents();
-        this.bindPhaseDetailEvents();
+        
         if (typeof ProjectDetail.initShowMore === 'function') {
           ProjectDetail.initShowMore();
         }
+        setTimeout(() => {
+          $('html, body').animate({ scrollTop: $("#project-detail").offset().top - 20 }, 400);
+        }, 100);
       })
       .fail((xhr) => {
-        const msg = xhr.responseJSON?.error || "Erro ao abrir projeto.";
-        App.showFeedback(msg, "danger", "#dashboard-feedback");
+        App.showFeedback(xhr.responseJSON?.error || "Erro ao abrir projeto.", "danger", "#dashboard-feedback");
       });
   },
 
@@ -231,19 +207,16 @@ const Projects = {
     $(".project-member-checkbox:checked").each(function () {
       const userId = parseInt($(this).val());
       const $select = $(this).closest('.member-row').find('.member-role-select');
-      const role = $select.length ? $select.val() : 'Colaborador';
-      selectedMembers.push({ usuario_id: userId, rol_especifico: role });
+      selectedMembers.push({ usuario_id: userId, rol_especifico: $select.length ? $select.val() : 'Colaborador' });
     });
 
     const initialPhases = [];
     $("#project-phases-inputs-container .dynamic-phase-input").each(function (index) {
-      const $nameInput = $(this).find(".phase-name-input, input[type='text']").first();
-      const $descInput = $(this).find(".phase-desc-input");
-      const phaseName = $nameInput.val().trim();
+      const phaseName = $(this).find(".phase-name-input, input[type='text']").first().val().trim();
       if (phaseName) {
         initialPhases.push({ 
           nombre: phaseName, 
-          descripcion: $descInput.length ? $descInput.val().trim() : '',
+          descripcion: $(this).find(".phase-desc-input").val().trim(),
           orden: index + 1 
         });
       }
@@ -279,8 +252,7 @@ const Projects = {
         }, 1000);
       })
       .fail((xhr) => {
-        const msg = xhr.responseJSON?.error || "Erro ao criar projeto.";
-        App.showFeedback(msg, "danger", "#create-project-feedback");
+        App.showFeedback(xhr.responseJSON?.error || "Erro ao criar projeto.", "danger", "#create-project-feedback");
         this.isSubmitting = false;
         $btn.prop("disabled", false);
       });
@@ -295,10 +267,7 @@ const Projects = {
     $("#edit-project-start-date").val(project.fecha_inicio);
     $("#edit-project-end-date").val(project.fecha_entrega);
     
-    // Popula select de responsáveis (jefes + admins)
-    const validManagers = App.users.filter(
-      (u) => u.rol === "jefe_proyecto" || u.rol === "administrador"
-    );
+    const validManagers = App.users.filter((u) => u.rol === "jefe_proyecto" || u.rol === "administrador");
     const options = validManagers
       .map((u) => `<option value="${u.id}" ${u.id == project.responsable_id ? 'selected' : ''}>${u.nombre} ${u.apellidos}</option>`)
       .join("");
@@ -340,24 +309,36 @@ const Projects = {
         }, 1000);
       })
       .fail((xhr) => {
-        const msg = xhr.responseJSON?.error || "Erro ao atualizar dados.";
-        App.showFeedback(msg, "danger", "#edit-project-feedback");
+        App.showFeedback(xhr.responseJSON?.error || "Erro ao atualizar dados.", "danger", "#edit-project-feedback");
         this.isSubmitting = false;
         $btn.prop("disabled", false);
       });
   },
 
   handleTogglePauseProject(id, isCurrentlyPaused) {
-    ApiClient.updateProject(id, { estado: isCurrentlyPaused ? "en_curso" : "pausado" })
+    const novoEstado = isCurrentlyPaused ? "en_curso" : "pausado";
+
+    ApiClient.updateProject(id, { estado: novoEstado })
       .done(() => {
         App.showFeedback("Estado do projeto atualizado com sucesso.", "success", "#dashboard-feedback");
-        this.loadProjects(true);
-        if (App.currentProjectId == id) this.openProject(id);
+        if (App.projects && App.projects.length > 0) {
+          App.projects = App.projects.map((p) => {
+            if (p.id == id) {
+              return { ...p, estado: novoEstado };
+            }
+            return p;
+          });
+        }
+        this.renderProjects();
+        this.renderSummary();
+
+        if (App.currentProjectId == id) {
+          this.openProject(id); 
+        }
+
       })
       .fail((xhr) => {
-        const msg = xhr.responseJSON?.error || xhr.responseText || "Erro ao alterar estado do projeto.";
-        console.error("Pause toggle error:", msg);
-        App.showFeedback(msg, "danger", "#dashboard-feedback");
+        App.showFeedback(xhr.responseJSON?.error || "Erro ao alterar estado.", "danger", "#dashboard-feedback");
       });
   },
 
@@ -372,237 +353,37 @@ const Projects = {
         });
       })
       .fail((xhr) => {
-        const msg = xhr.responseJSON?.error || "Falha ao deletar o projeto.";
-        App.showFeedback(msg, "danger", "#dashboard-feedback");
+        App.showFeedback(xhr.responseJSON?.error || "Falha ao deletar o projeto.", "danger", "#dashboard-feedback");
       });
   },
 
-  handleCreatePhase() {
-    if (!App.currentProjectId) { alert("Nenhum projeto selecionado."); return; }
-    if (this.isSubmitting) return;
+  bindGlobalEvents() {
+    const self = this;
 
-    const $form = $("#create-phase-form");
-    const $btn = $form.find("button[type='submit']");
 
-    this.isSubmitting = true;
-    $btn.prop("disabled", true);
+    $("#projects-table").off("click");
+    $("#detail-body").off("click");
+    $(document).off("click", ".remove-phase-field-btn");
 
-    const phaseData = {
-      nombre: $("#phase-name").val(),
-      descripcion: $("#phase-description").val(),
-      orden: parseInt($("#phase-order").val()) || 1,
-    };
-
-    ApiClient.createPhase(App.currentProjectId, phaseData)
-      .done(() => {
-        App.showFeedback("Fase adicionada com sucesso!", "success", "#create-phase-feedback");
-        $form[0].reset();
-        this.openProject(App.currentProjectId);
-        setTimeout(() => {
-          const modal = bootstrap.Modal.getInstance(document.getElementById("create-phase-modal"));
-          if (modal) modal.hide();
-          $("#create-phase-feedback").empty();
-          this.isSubmitting = false;
-          $btn.prop("disabled", false);
-        }, 1000);
+    $("#projects-table")
+      .on("click", ".view-project-btn", function() { self.openProject($(this).data("id")); })
+      .on("click", ".pause-project-btn", function(e) { 
+        e.stopPropagation();
+        self.handleTogglePauseProject($(this).data("id"), $(this).data("paused")); 
       })
-      .fail((xhr) => {
-        const msg = xhr.responseJSON?.error || "Erro ao criar fase.";
-        App.showFeedback(msg, "danger", "#create-phase-feedback");
-        this.isSubmitting = false;
-        $btn.prop("disabled", false);
-      });
-  },
+      .on("click", ".delete-project-btn", function() { self.handleDeleteProject($(this).data("id")); });
+    $("#detail-body")
+      .on("click", "#open-edit-project-modal-btn", function() { self.showEditProjectModal($(this).data("id")); })
+      .on("change", ".toggle-phase-checkbox", function() { ProjectPhases.handleToggle($(this).data("project-id"), $(this).data("phase-id"), this.checked, $(this)); })
+      .on("click", ".move-phase-up", function() { ProjectPhases.handleOrderChange($(this).data("phase-id"), $(this).data("project-id"), "up"); })
+      .on("click", ".move-phase-down", function() { ProjectPhases.handleOrderChange($(this).data("phase-id"), $(this).data("project-id"), "down"); })
+      .on("click", ".add-phase-btn", function() { ProjectPhases.handleCreateInline($(this)); })
+      .on("click", ".remove-phase-btn", function() { ProjectPhases.handleDelete($(this)); })
+      .on("click", ".add-member-btn", function() { ProjectMembers.handleAdd($(this)); })
+      .on("click", ".remove-member-btn", function() { ProjectMembers.handleRemove($(this)); });
 
-  handleTogglePhase(projectId, phaseId, isChecked, checkbox) {
-    checkbox.prop("disabled", true);
-    ApiClient.togglePhase(phaseId, isChecked)
-      .done(() => {
-        this.openProject(projectId);
-      })
-      .fail((xhr) => {
-        checkbox.prop("checked", !isChecked);
-        alert(xhr.responseJSON?.error || "Não foi possível alterar o estado da fase.");
-      })
-      .always(() => checkbox.prop("disabled", false));
-  },
-
-  handleMovePhase(projectId, phaseId, newOrder) {
-    const $phaseItem = $(`.phase-item[data-phase-id="${phaseId}"]`);
-    const originalOrder = parseInt($phaseItem.find('.badge').text().replace('Ordem: ', ''));
-    
-    ApiClient.updatePhase(phaseId, { orden: newOrder })
-      .done(() => {
-        this.openProject(projectId);
-      })
-      .fail((xhr) => {
-        alert(xhr.responseJSON?.error || "Erro ao reordenar fase.");
-        this.openProject(projectId); // restaura visual
-      });
-  },
-
-  bindPhaseReorderEvents() {
-    // Move phase up
-    $("#detail-body").off("click", ".move-phase-up").on("click", ".move-phase-up", (e) => {
-      const $btn = $(e.currentTarget);
-      const phaseId = $btn.data("phase-id");
-      const projectId = $btn.data("project-id");
-      const $phaseItem = $btn.closest(".phase-item");
-      const $prevItem = $phaseItem.prev(".phase-item");
-      
-      if ($prevItem.length === 0) return;
-      
-      const prevPhaseId = $prevItem.data("phase-id");
-      const prevOrder = parseInt($prevItem.find('.badge').text().replace('Ordem: ', ''));
-      const currentOrder = parseInt($phaseItem.find('.badge').text().replace('Ordem: ', ''));
-      
-      // Swap orders locally first for immediate feedback
-      $phaseItem.find('.badge').text(`Ordem: ${prevOrder}`);
-      $prevItem.find('.badge').text(`Ordem: ${currentOrder}`);
-      
-      // Disable buttons during request
-      $phaseItem.find("button").prop("disabled", true);
-      $prevItem.find("button").prop("disabled", true);
-      
-      // Update both phases
-      ApiClient.updatePhase(phaseId, { orden: prevOrder })
-        .done(() => ApiClient.updatePhase(prevPhaseId, { orden: currentOrder }))
-        .done(() => {
-          this.openProject(projectId);
-        })
-        .fail((xhr) => {
-          alert(xhr.responseJSON?.error || "Erro ao reordenar fase.");
-          this.openProject(projectId);
-        });
-    });
-
-    // Move phase down
-    $("#detail-body").off("click", ".move-phase-down").on("click", ".move-phase-down", (e) => {
-      const $btn = $(e.currentTarget);
-      const phaseId = $btn.data("phase-id");
-      const projectId = $btn.data("project-id");
-      const $phaseItem = $btn.closest(".phase-item");
-      const $nextItem = $phaseItem.next(".phase-item");
-      
-      if ($nextItem.length === 0) return;
-      
-      const nextPhaseId = $nextItem.data("phase-id");
-      const nextOrder = parseInt($nextItem.find('.badge').text().replace('Ordem: ', ''));
-      const currentOrder = parseInt($phaseItem.find('.badge').text().replace('Ordem: ', ''));
-      
-      // Swap orders locally first for immediate feedback
-      $phaseItem.find('.badge').text(`Ordem: ${nextOrder}`);
-      $nextItem.find('.badge').text(`Ordem: ${currentOrder}`);
-      
-      // Disable buttons during request
-      $phaseItem.find("button").prop("disabled", true);
-      $nextItem.find("button").prop("disabled", true);
-      
-      // Update both phases
-      ApiClient.updatePhase(phaseId, { orden: nextOrder })
-        .done(() => ApiClient.updatePhase(nextPhaseId, { orden: currentOrder }))
-        .done(() => {
-          this.openProject(projectId);
-        })
-        .fail((xhr) => {
-          alert(xhr.responseJSON?.error || "Erro ao reordenar fase.");
-          this.openProject(projectId);
-        });
-    });
-  },
-
-  bindMemberManagementEvents() {
-    $("#detail-body").off("click", ".add-member-btn").on("click", ".add-member-btn", (e) => {
-      const $btn = $(e.currentTarget);
-      const projectId = $btn.data("project-id");
-      const $select = $btn.siblings(".add-member-select");
-      const $roleSelect = $btn.siblings(".add-member-role-select");
-      const userId = parseInt($select.val());
-      const role = $roleSelect.length ? $roleSelect.val() : "Colaborador";
-
-      if (!userId) return;
-
-      ApiClient.addMember(projectId, userId, role)
-        .done(() => {
-          this.openProject(projectId);
-        })
-        .fail((xhr) => {
-          alert(xhr.responseJSON?.error || "Erro ao adicionar membro.");
-        });
-    });
-
-    $("#detail-body").off("click", ".remove-member-btn").on("click", ".remove-member-btn", (e) => {
-      const projectId = $(e.currentTarget).data("project-id");
-      const userId = $(e.currentTarget).data("user-id");
-
-      if (!confirm("Tem certeza que deseja remover este membro do projeto?")) return;
-
-      ApiClient.removeMember(projectId, userId)
-        .done(() => {
-          this.openProject(projectId);
-        })
-        .fail((xhr) => {
-          alert(xhr.responseJSON?.error || "Erro ao remover membro.");
-        });
-    });
-  },
-
-  bindPhaseDetailEvents() {
-    $("#detail-body").off("click", ".add-phase-btn").on("click", ".add-phase-btn", (e) => {
-      const $btn = $(e.currentTarget);
-      const projectId = $btn.data("project-id");
-      const $nameInput = $btn.siblings(".new-phase-name-input");
-      const $descInput = $btn.siblings(".new-phase-desc-input");
-      const nombre = $nameInput.val().trim();
-
-      if (!nombre) {
-        alert("Informe o nome da fase.");
-        return;
-      }
-
-      const nextOrder = ($("#detail-body .phase-item").length + 1);
-
-      const phaseData = {
-        nombre,
-        descripcion: $descInput.val().trim() || "Fase criada a partir do detalhe do projeto.",
-        orden: nextOrder,
-      };
-
-      ApiClient.createPhase(projectId, phaseData)
-        .done(() => {
-          this.openProject(projectId);
-        })
-        .fail((xhr) => {
-          alert(xhr.responseJSON?.error || "Erro ao adicionar fase.");
-        });
-    });
-
-    $("#detail-body").off("click", ".remove-phase-btn").on("click", ".remove-phase-btn", (e) => {
-      const phaseId = $(e.currentTarget).data("phase-id");
-      if (!confirm("Tem certeza que deseja excluir esta fase?")) return;
-
-      ApiClient.deletePhase(phaseId)
-        .done(() => {
-          this.openProject(App.currentProjectId);
-        })
-        .fail((xhr) => {
-          alert(xhr.responseJSON?.error || "Erro ao excluir fase.");
-        });
-    });
-  },
-
-  appendPhaseField() {
-    const $container = $("#project-phases-inputs-container");
-    if ($container.children(".dynamic-phase-input").length >= 15) {
-      alert("Limite máximo de 15 fases atingido.");
-      return;
-    }
-    $container.append(`
-      <div class="input-group mb-2 dynamic-phase-input">
-        <input type="text" class="form-control form-control-sm phase-name-input" placeholder="Ex: Nova Fase" required />
-        <textarea class="form-control form-control-sm phase-desc-input" rows="2" placeholder="Descrição (opcional)"></textarea>
-        <button class="btn btn-outline-danger btn-sm remove-phase-field-btn" type="button">×</button>
-      </div>
-    `);
+    $(document).on("click", ".remove-phase-field-btn", function() { $(this).closest(".dynamic-phase-input").remove(); });
   }
 };
+
+$(document).ready(() => Projects.init());

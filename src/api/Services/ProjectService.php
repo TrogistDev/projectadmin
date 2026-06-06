@@ -10,7 +10,6 @@ use Api\Utils\Validator;
 use Api\Services\MemberService;
 use Api\Services\PhaseService;
 use PDO;
-use Throwable;
 
 class ProjectService
 {
@@ -25,6 +24,9 @@ class ProjectService
         $this->phaseService = new PhaseService();
     }
 
+    /**
+     * Lista projetos paginados e calcula estatísticas delegando o SQL para o Repository
+     */
     public function list(array $filter = [], array $user = []): array
     {
         [$where, $params] = $this->buildWhereClause($filter, $user);
@@ -32,32 +34,18 @@ class ProjectService
         $limit = (int)($filter['limit'] ?? 10);
         $page = max(1, (int)($filter['page'] ?? 1));
         $offset = ($page - 1) * $limit;
-
-        $selectSql = $this->buildSelectQuery($user);
         
-        try {
-            $data = $this->repository->list($where, $params, $limit, $offset, $selectSql);
-        } catch (\PDOException $e) {
-            error_log('Project list SQL error: ' . $e->getMessage());
-            throw $e;
-        }
-
-        $countSql = 'SELECT COUNT(*) FROM proyectos p JOIN usuarios u ON u.id = p.responsable_id';
-        if (($user['rol'] ?? '') === 'colaborador') {
-            $countSql .= ' JOIN proyecto_miembro pm ON pm.proyecto_id = p.id';
-        }
-
-        $statusSql = 'SELECT estado, COUNT(*) as qtd FROM proyectos p JOIN usuarios u ON u.id = p.responsable_id';
-        if (($user['rol'] ?? '') === 'colaborador') {
-            $statusSql .= ' JOIN proyecto_miembro pm ON pm.proyecto_id = p.id';
-        }
+        $userRole = (string)($user['rol'] ?? '');
 
         return [
-            'data' => $data,
-            'page' => $page,
-            'limit' => $limit,
-            'total' => $this->repository->countTotal($where, $params, $countSql),
-            'totais_por_estado' => $this->repository->countByStatus($where, $params, $statusSql),
+            'data'              => $this->repository->getFilteredProjects($where, $params, $limit, $offset, $userRole, [
+                'date_order'     => (string)($filter['date_order'] ?? ''),
+                'deadline_order' => (string)($filter['deadline_order'] ?? ''),
+            ]),
+            'page'              => $page,
+            'limit'             => $limit,
+            'total'             => $this->repository->countTotal($where, $params, $userRole),
+            'totais_por_estado' => $this->repository->countByStatus($where, $params, $userRole),
         ];
     }
 
@@ -109,9 +97,7 @@ class ProjectService
     public function delete(int $id): void
     {
         Database::transaction(function (PDO $pdo) use ($id) {
-            $pdo->prepare('DELETE FROM proyecto_miembro WHERE proyecto_id = :id')->execute(['id' => $id]);
-            $pdo->prepare('DELETE FROM fases WHERE proyecto_id = :id')->execute(['id' => $id]);
-            $pdo->prepare('DELETE FROM proyectos WHERE id = :id')->execute(['id' => $id]);
+            $this->repository->deleteCascade($pdo, $id);
         });
     }
 
@@ -142,16 +128,9 @@ class ProjectService
         return $this->repository->isResponsible($projectId, $userId);
     }
 
-    // Helpers privados de mapeamento de dados (Deixam o Service limpo)
-
-    private function buildSelectQuery(array $user): string
-    {
-        $sql = 'SELECT p.*, u.nombre AS responsable_nombre, u.apellidos AS responsable_apellidos FROM proyectos p JOIN usuarios u ON u.id = p.responsable_id';
-        if (($user['rol'] ?? '') === 'colaborador') {
-            $sql .= ' JOIN proyecto_miembro pm ON pm.proyecto_id = p.id';
-        }
-        return $sql;
-    }
+    // ==========================================
+    // HELPERS PRIVADOS DE MAPEAMENTO E PARSING
+    // ==========================================
 
     private function buildWhereClause(array $filter, array $user): array
     {
@@ -164,8 +143,8 @@ class ProjectService
         }
 
         $filterMap = [
-            'search' => ['cond' => 'LOWER(p.nombre) LIKE :search', 'type' => 'search'],
-            'estado' => ['cond' => 'p.estado = :estado', 'type' => 'direct'],
+            'search'         => ['cond' => 'LOWER(p.nombre) LIKE :search', 'type' => 'search'],
+            'estado'         => ['cond' => 'p.estado = :estado', 'type' => 'direct'],
             'responsable_id' => ['cond' => 'p.responsable_id = :responsable_id', 'type' => 'int'],
         ];
 

@@ -56,8 +56,19 @@ class ProjectController
             Response::error('No autorizado para crear proyectos.', 403);
         }
 
-        $projectId = $this->service->create($request->getBody());
-        Response::json(['id' => $projectId], 201);
+        try {
+            $projectId = $this->service->create($request->getBody());
+            Response::json(['id' => $projectId], 201);
+        } catch (\PDOException $e) {
+            if ($e->getCode() === '23000') {
+                Response::error('Já existe um projeto com esse nome. Escolha outro.', 400);
+            }
+            error_log('Create error: ' . $e->getMessage());
+            Response::error('Erro ao criar projeto.', 500);
+        } catch (\Throwable $e) {
+            error_log('Create error: ' . $e->getMessage());
+            Response::error('Erro ao criar projeto.', 500);
+        }
     }
 
     public function update(int $id, Request $request): void

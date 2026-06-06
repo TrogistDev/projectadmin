@@ -34,7 +34,7 @@ const App = {
     $("#logout-button").on("click", () => Auth.handleLogout());
 
     $("#create-project-form").on("submit", (e) => { e.preventDefault(); Projects.handleCreateProject(); });
-    $(document).on("click", "#add-phase-field-btn", (e) => { e.preventDefault(); Projects.appendPhaseField(); });
+    $(document).on("click", "#add-phase-field-btn", (e) => { e.preventDefault(); ProjectPhases.appendField(); });
     $("#project-phases-inputs-container").on("click", ".remove-phase-field-btn", (e) => { e.preventDefault(); $(e.target).closest(".dynamic-phase-input").remove(); });
     
     $(document).on("submit", "#create-phase-form", (e) => { 
@@ -50,23 +50,7 @@ const App = {
     });
     $("#create-user-form").on("submit", (e) => { e.preventDefault(); Users.handleCreateUser(); });
 
-    $("#dashboard-screen").on("click", ".view-project-btn", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      const id = $(event.target).data("id");
-      if (id) {
-        Projects.openProject(id);
-        setTimeout(() => {
-          const $detail = $("#project-detail");
-          if ($detail.length && !$detail.hasClass("d-none")) {
-            $('html, body').animate({
-              scrollTop: $detail.offset().top - 20
-            }, 400);
-          }
-        }, 150);
-      }
-    });
-
+    $("#close-detail").on("click", () => this.closeDetail());
     $("#dashboard-screen").on("click", "#create-project-button", () => {
       Projects.showCreateProjectModal();
     });
@@ -85,7 +69,7 @@ const App = {
       const phaseId = $checkbox.data("phase-id");
       const projectId = $checkbox.data("project-id");
       const isChecked = $checkbox.is(":checked");
-      Projects.handleTogglePhase(projectId, phaseId, isChecked, $checkbox);
+      ProjectPhases.handleToggle(projectId, phaseId, isChecked, $checkbox);
     });
 
     $("#dashboard-screen").on("click", ".pause-project-btn", (event) => {
@@ -130,11 +114,15 @@ const App = {
   },
 
   showFeedback(message, type = "info", target = "#login-feedback") {
-    $(target).html(`
+    const el = $(target);
+    el.html(`
       <div class="alert alert-${type} alert-dismissible fade show" role="alert">
         ${message}
         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
       </div>`);
+    if (type === "danger") {
+      $('html, body').animate({ scrollTop: el.offset().top - 20 }, 400);
+    }
   }
 };
 

@@ -9,13 +9,13 @@ const ProjectDetail = {
 
     const canManageTeam = currentUser.rol === 'administrador' || currentUser.rol === 'jefe_proyecto';
 
-const canReorderPhases = (currentUser.rol === 'administrador') || 
-                              (currentUser.rol === 'jefe_proyecto' && project.responsable_id == currentUser.id);
+    const canReorderPhases = (currentUser.rol === 'administrador') || 
+                             (currentUser.rol === 'jefe_proyecto' && project.responsable_id == currentUser.id);
 
     const projectPhases = project.phases || project.fases || [];
     const projectMembers = project.members || project.miembros || project.equipo || [];
 
-    // Fases: nome + descrição + badge ordem, botões ABAIXO alinhados à esquerda
+    // Fases: Corrigido adicionando data-project-id e data-phase-id nos botões de ação
     const phasesHtml = projectPhases.length > 0
       ? projectPhases.map((phase, index) => {
           const isCompleted = phase.completada == 1 || phase.completada === true;
@@ -48,7 +48,7 @@ const canReorderPhases = (currentUser.rol === 'administrador') ||
                   </button>
                 ` : ''}
                 ${canEdit ? `
-                  <button class="btn btn-sm btn-outline-danger remove-phase-btn" data-project-id="${project.id}" data-phase-id="${phase.id}" title="Excluir fase">
+                  <button class="btn btn-sm btn-outline-danger remove-phase-btn" data-phase-id="${phase.id}" data-project-id="${project.id}" title="Excluir fase">
                     <i class="fas fa-trash"></i>
                   </button>
                 ` : ''}
@@ -58,7 +58,7 @@ const canReorderPhases = (currentUser.rol === 'administrador') ||
         }).join("")
       : `<p class="text-muted p-2 m-0">Nenhuma fase cadastrada neste projeto.</p>`;
 
-    // Formulário de adicionar fase (linha horizontal)
+    // Formulário de adicionar fase: Adicionado data-project-id no botão
     const phaseManagementHtml = canEdit ? `
       <div class="mt-3 d-flex flex-column gap-2" style="max-width: 400px;">
         <input type="text" class="form-control form-control-sm new-phase-name-input" placeholder="Nova fase..." />
@@ -69,7 +69,7 @@ const canReorderPhases = (currentUser.rol === 'administrador') ||
       </div>
     ` : '';
 
-    // Membros: render SEM vírgulas
+    // Membros: Corrigido adicionando data-project-id e data-user-id no botão de remoção
     const membersHtml = projectMembers.length > 0
       ? projectMembers.map(m => `
         <li class="list-group-item d-flex justify-content-between align-items-center">
@@ -79,16 +79,17 @@ const canReorderPhases = (currentUser.rol === 'administrador') ||
           </div>
           <div class="d-flex align-items-center gap-2">
             <span class="badge bg-info">${m.rol_especifico || 'Membro'}</span>
-            ${canManageTeam ? `<button class="btn btn-sm btn-outline-danger remove-member-btn" data-project-id="${project.id}" data-user-id="${m.usuario_id}" title="Remover membro"><i class="fas fa-times"></i></button>` : ''}
+            ${canManageTeam ? `<button class="btn btn-sm btn-outline-danger remove-member-btn" data-project-id="${project.id}" data-user-id="${m.usuario_id || m.id}" title="Remover membro"><i class="fas fa-times"></i></button>` : ''}
           </div>
         </li>`).join("")
       : `<p class="text-muted p-2 m-0">Nenhum membro alocado.</p>`;
 
     const allUsers = App.users || [];
-    const memberUserIds = (projectMembers || []).map(m => parseInt(m.usuario_id));
+    const memberUserIds = (projectMembers || []).map(m => parseInt(m.usuario_id || m.id));
     const availableUsers = allUsers.filter(u => !memberUserIds.includes(parseInt(u.id)) && parseInt(u.id) !== parseInt(project.responsable_id));
     const availableUsersOptions = availableUsers.map(u => `<option value="${u.id}">${u.nombre} ${u.apellidos} (${u.rol})</option>`).join("");
 
+    // Gerenciamento de equipe: Adicionado data-project-id em todos os elementos de controle de contexto
     const memberManagementHtml = canManageTeam ? `
       <div class="mt-2 d-flex gap-2 align-items-center">
         <select class="form-select form-select-sm add-member-select" data-project-id="${project.id}" style="max-width:260px;">
@@ -143,9 +144,9 @@ const canReorderPhases = (currentUser.rol === 'administrador') ||
             <div class="card-header bg-light">
               <h6 class="mb-0">Membros da Equipe</h6>
             </div>
-            <ul class="list-group list-group-flush">
+          <ul class="list-group list-group-flush">
               ${membersHtml}
-            </ul>
+            </div>
             ${memberManagementHtml}
           </div>
         </div>
